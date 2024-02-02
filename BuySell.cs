@@ -1,10 +1,12 @@
 ﻿namespace ATAS.Indicators.Technical
 {
     using System;
+    using System.Collections.ObjectModel;
     using System.ComponentModel;
     using System.ComponentModel.DataAnnotations;
     using System.Drawing;
     using System.Globalization;
+    using System.Reflection;
     using System.Resources;
     using System.Runtime.Intrinsics.X86;
     using System.Security.Principal;
@@ -14,18 +16,50 @@
     using ATAS.Indicators.Other;
     using ATAS.Indicators.Technical.Properties;
     using OFT.Attributes;
+    using OFT.Attributes.Editors;
     using OFT.Rendering.Context;
     using OFT.Rendering.Settings;
     using OFT.Rendering.Tools;
     using static ATAS.Indicators.Technical.BarTimer;
+    using static ATAS.Indicators.Technical.SampleProperties;
     using Color = System.Drawing.Color;
     using Pen = System.Drawing.Pen;
 
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
+        private class candleColor : Collection<Entity>
+        {
+            public candleColor()
+                : base(new[]
+                {
+                    new Entity { Value = 1, Name = "None" },
+                    new Entity { Value = 2, Name = "Waddah Explosion" },
+                    new Entity { Value = 3, Name = "Squeeze" },
+                    new Entity { Value = 4, Name = "Delta" }
+                }) { }
+        }
+        [Display(Name = "Candle Color", GroupName = "Colored Candles")]
+        [ComboBoxEditor(typeof(candleColor), DisplayMember = nameof(Entity.Name), ValueMember = nameof(Entity.Value))]
+        public int canColor 
+        {
+            get => CandleColoring;
+            set
+            {
+                if (value < 0)
+                    return;
+                CandleColoring = value;
+                RecalculateValues();
+            }
+        }
+
+        public decimal Decimal { get; set; }
         private readonly PaintbarsDataSeries _paintBars = new("Paint bars");
 
+        private int _lastBar = -1;
+        private bool _lastBarCounted;
+
+        private const String sVersion = "1.18";
         private bool bAdvanced = true;
         private bool bUseFisher = true;
         private bool bUseT3 = true;
@@ -59,6 +93,7 @@
         private int iKAMAPeriod = 9;
         private int iOffset = 9;
         private int iFontSize = 10;
+        private int CandleColoring = 0;
 
 
         protected override void OnApplyDefaultColors()
@@ -229,25 +264,24 @@
         // ========================================================================
 
         [Display(GroupName = "Colored Candles", Name = "Show Reversal Patterns")]
-        public bool ShowRevPattern
-        {
-            get => bShowRevPattern; set { bShowRevPattern = value; RecalculateValues(); }
-        }
-        [Display(GroupName = "Colored Candles", Name = "Use Squeeze Candles")]
-        public bool Use_Squeeze_Candles
-        {
-            get => bSqueezeCandles; set { bSqueezeCandles = value; RecalculateValues(); }
-        }
-        [Display(GroupName = "Colored Candles", Name = "Use Delta Candles")]
-        public bool Use_Delta_Candles
-        {
-            get => bDeltaCandles; set { bDeltaCandles = value; RecalculateValues(); }
-        }
-        [Display(GroupName = "Colored Candles", Name = "Use Waddah Candles")]
-        public bool Use_Waddah_Candles
-        {
-            get => bWaddahCandles; set { bWaddahCandles = value; RecalculateValues(); }
-        }
+        public bool ShowRevPattern { get => bShowRevPattern; set { bShowRevPattern = value; RecalculateValues(); } }
+        /*
+                [Display(GroupName = "Colored Candles", Name = "Use Squeeze Candles")]
+                public bool Use_Squeeze_Candles
+                {
+                    get => bSqueezeCandles; set { bSqueezeCandles = value; RecalculateValues(); }
+                }
+                [Display(GroupName = "Colored Candles", Name = "Use Delta Candles")]
+                public bool Use_Delta_Candles
+                {
+                    get => bDeltaCandles; set { bDeltaCandles = value; RecalculateValues(); }
+                }
+                [Display(GroupName = "Colored Candles", Name = "Use Waddah Candles")]
+                public bool Use_Waddah_Candles
+                {
+                    get => bWaddahCandles; set { bWaddahCandles = value; RecalculateValues(); }
+                }
+        */
         [Display(GroupName = "Colored Candles", Name = "Waddah Sensitivity")]
         [Range(0, 9000)]
         public int WaddaSensitivity
@@ -263,18 +297,23 @@
         }
 
         // ========================================================================
-        // =======================    EXTRA INDICATORS    =========================
+        // ====================    EXTRA INDICATORS / ALERTS   ====================
         // ========================================================================
 
-        [Display(GroupName = "Other", Name = "Show Advanced Ideas")]
+        [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "UseAlerts")]
+        public bool UseAlerts { get; set; }
+        [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "AlertFile")]
+        public string AlertFile { get; set; } = "alert1";
+
+        [Display(GroupName = "Extras", Name = "Show Advanced Ideas")]
         public bool ShowBrooks { get => bAdvanced; set { bAdvanced = value; RecalculateValues(); } }
-        [Display(GroupName = "Extra Indicators", Name = "Show Triple Supertrend")]
+        [Display(GroupName = "Extras", Name = "Show Triple Supertrend")]
         public bool ShowTripleSupertrend { get => bShowTripleSupertrend; set { bShowTripleSupertrend = value; RecalculateValues(); } }
-        [Display(GroupName = "Extra Indicators", Name = "Show 9/21 EMA Cross")]
+        [Display(GroupName = "Extras", Name = "Show 9/21 EMA Cross")]
         public bool Show_9_21_EMA_Cross { get => bShow921; set { bShow921 = value; RecalculateValues(); } }
-        [Display(GroupName = "Extra Indicators", Name = "Show Squeeze Relaxer")]
+        [Display(GroupName = "Extras", Name = "Show Squeeze Relaxer")]
         public bool Show_Squeeze_Relax { get => bShowSqueeze; set { bShowSqueeze = value; RecalculateValues(); } }
-        [Display(GroupName = "Extra Indicators", Name = "Show Volume Imbalances", Description = "Show gaps between two candles, indicating market strength")]
+        [Display(GroupName = "Extras", Name = "Show Volume Imbalances", Description = "Show gaps between two candles, indicating market strength")]
         public bool Use_VolumeImbalances { get => bVolumeImbalances; set { bVolumeImbalances = value; RecalculateValues(); } }
 
         // ========================================================================
@@ -383,6 +422,7 @@
             if (bar == 0)
             {
                 HorizontalLinesTillTouch.Clear();
+                _lastBarCounted = false;
             }
             else if (bar < 5)
                 return;
@@ -553,40 +593,7 @@
             // ========================    UP CONDITIONS    ===========================
             // ========================================================================
 
-            if (candle.Delta < iMinDelta)
-                bShowUp = false;
-
-            if (!macdUp && bUseMACD)
-                bShowUp = false;
-
-            if (psarSell && bUsePSAR)
-                bShowUp = false;
-
-            if (!fisherUp && bUseFisher)
-                bShowUp = false;
-
-            if (candle.Close < t3 && bUseT3)
-                bShowUp = false;
-
-            if (candle.Close < kama && bUseKAMA)
-                bShowUp = false;
-
-            if (candle.Close < myema && bUseMyEMA)
-                bShowUp = false;
-
-            if (t1 < 0 && bUseWaddah)
-                bShowUp = false;
-
-            if (ao < 0 && bUseAO)
-                bShowUp = false;
-
-            if (stu2 == 0 && bUseSuperTrend)
-                bShowUp = false;
-
-            if (sq1 < 0 && bUseSqueeze)
-                bShowUp = false;
-
-            if (x < iMinADX)
+            if ((candle.Delta < iMinDelta) ||  (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || (x < iMinADX))
                 bShowUp = false;
 
             if (green && bShowUp)
@@ -596,56 +603,44 @@
             // ========================    DOWN CONDITIONS    =========================
             // ========================================================================
 
-            if (candle.Delta > (iMinDelta * -1))
-                bShowDown = false;
-
-            if (psarBuy && bUsePSAR)
-                bShowDown = false;
-
-            if (!macdDown && bUseMACD)
-                bShowDown = false;
-
-            if (!fisherDown && bUseFisher)
-                bShowDown = false;
-
-            if (candle.Close > kama && bUseKAMA)
-                bShowDown = false;
-
-            if (candle.Close > t3 && bUseT3)
-                bShowDown = false;
-
-            if (candle.Close > myema && bUseMyEMA)
-                bShowDown = false;
-
-            if (t1 >= 0 && bUseWaddah)
-                bShowDown = false;
-
-            if (ao > 0 && bUseAO)
-                bShowDown = false;
-
-            if (std2 == 0 && bUseSuperTrend)
-                bShowDown = false;
-
-            if (sq1 > 0 && bUseSqueeze)
-                bShowDown = false;
-
-            if (x < iMinADX)
+            if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) ||             (value > kama && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (x < iMinADX))
                 bShowDown = false;
 
             if (red && bShowDown)
                 _negSeries[bar] = candle.High + InstrumentInfo.TickSize * 2;
 
+            if (_lastBar != bar)
+            {
+                if (_lastBarCounted && UseAlerts)
+                {
+                    if (bVolumeImbalances)
+                        if ((green && c1G && candle.Open > p1C.Close) || (red && c1R && candle.Open < p1C.Close))
+                            AddAlert(AlertFile, "Volume Imbalance");
+
+                    if (bShowUp)
+                        AddAlert(AlertFile, "BUY Signal");
+                    else if (bShowDown)
+                        AddAlert(AlertFile, "BUY Signal");
+                }
+                _lastBar = bar;
+            }
+            else
+            {
+                if (!_lastBarCounted)
+                    _lastBarCounted = true;
+            }
+
             var waddah = Math.Min(Math.Abs(t1) + 70, 255);
-            if (bWaddahCandles)
+            if (canColor == 2) // (bWaddahCandles)
                 _paintBars[bar] = t1 > 0 ? System.Windows.Media.Color.FromArgb(255, 0, (byte)waddah, 0) : System.Windows.Media.Color.FromArgb(255, (byte)waddah, 0, 0);
 
-            var filteredDelta = Math.Min(Math.Abs(candle.Delta), 255);
-            if (bDeltaCandles)
-                _paintBars[bar] = candle.Delta > 0 ? System.Windows.Media.Color.FromArgb(255, 0, (byte)filteredDelta, 0) : System.Windows.Media.Color.FromArgb(255, (byte)filteredDelta, 0, 0);
-
             var filteredSQ = Math.Min(Math.Abs(sq1 * 25), 255);
-            if (bSqueezeCandles)
+            if (canColor == 3) // (bSqueezeCandles)
                 _paintBars[bar] = sq1 > 0 ? System.Windows.Media.Color.FromArgb(255, 0, (byte)filteredSQ, 0) : System.Windows.Media.Color.FromArgb(255, (byte)filteredSQ, 0, 0);
+
+            var filteredDelta = Math.Min(Math.Abs(candle.Delta), 255);
+            if (canColor == 4) // (bDeltaCandles)
+                _paintBars[bar] = candle.Delta > 0 ? System.Windows.Media.Color.FromArgb(255, 0, (byte)filteredDelta, 0) : System.Windows.Media.Color.FromArgb(255, (byte)filteredDelta, 0, 0);
 
             // ========================================================================
             // =======================    REVERSAL PATTERNS    ========================
