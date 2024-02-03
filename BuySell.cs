@@ -22,12 +22,16 @@
     using OFT.Rendering.Tools;
     using static ATAS.Indicators.Technical.BarTimer;
     using static ATAS.Indicators.Technical.SampleProperties;
+
     using Color = System.Drawing.Color;
+    using MColor = System.Windows.Media.Color;
     using Pen = System.Drawing.Pen;
 
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
+        private const String sVersion = "1.19";
+
         private class candleColor : Collection<Entity>
         {
             public candleColor()
@@ -59,7 +63,6 @@
         private int _lastBar = -1;
         private bool _lastBarCounted;
 
-        private const String sVersion = "1.18";
         private bool bAdvanced = true;
         private bool bUseFisher = true;
         private bool bUseT3 = true;
@@ -67,21 +70,19 @@
         private bool bUseSqueeze = false;
         private bool bUseMACD = false;
         private bool bUseWaddah = true;
-        private bool bUseAO = false;
+        private bool bUseAO = true;
         private bool bUseKAMA = false;
         private bool bUseMyEMA = false;
-        private bool bUsePSAR = false;
-        private bool bVolumeImbalances = false;
+        private bool bUsePSAR = true;
+        private bool bVolumeImbalances = true;
 
-        private bool bWaddahCandles = false;
-        private int iWaddaSensitivity = 150;
-        private bool bDeltaCandles = false;
-        private bool bSqueezeCandles = false;
+        private int iWaddaSensitivity = 120;
 
         private bool bShow921 = false;
         private bool bShowSqueeze = false;
         private bool bShowRevPattern = false;
         private bool bShowTripleSupertrend = false;
+        private bool bShowCloud = false;
 
         private bool bShowUp = true;
         private bool bShowDown = true;
@@ -95,7 +96,6 @@
         private int iFontSize = 10;
         private int CandleColoring = 0;
 
-
         protected override void OnApplyDefaultColors()
         {
             if (ChartInfo is null)
@@ -105,7 +105,8 @@
         public BuySell() :
             base(true)
         {
-            EnableCustomDrawing = true;
+            // EnableCustomDrawing = true;
+            DenyToChangePanel = true;
 
             DataSeries[0] = _posSeries;
             DataSeries.Add(_negSeries);
@@ -116,6 +117,8 @@
             DataSeries.Add(_paintBars);
             DataSeries.Add(_dnTrend);
             DataSeries.Add(_upTrend);
+            DataSeries.Add(_upCloud);
+            DataSeries.Add(_dnCloud);
 
             Add(_ao);
             Add(_ft);
@@ -125,7 +128,8 @@
             Add(_st2);
             Add(_st3);
             Add(_adx);
-            Add(_kama);
+            Add(_kama9);
+            Add(_kama21);
             Add(_atr);
         }
 
@@ -180,9 +184,13 @@
         {
             Period = 20, Shift = 0, Width = 2
         };
-        private readonly KAMA _kama = new KAMA()
+        private readonly KAMA _kama9 = new KAMA()
         {
-            ShortPeriod = 2, LongPeriod = 30, EfficiencyRatioPeriod = 9
+            ShortPeriod = 2, LongPeriod = 105, EfficiencyRatioPeriod = 9
+        };
+        private readonly KAMA _kama21 = new KAMA()
+        {
+            ShortPeriod = 2, LongPeriod = 105, EfficiencyRatioPeriod = 21
         };
         private readonly SchaffTrendCycle _stc = new SchaffTrendCycle()
         {
@@ -218,6 +226,17 @@
         // ========================================================================
         // =========================    DATA SERIES    ============================
         // ========================================================================
+
+        private RangeDataSeries _upCloud = new("Up Cloud")
+        {
+            RangeColor = MColor.FromArgb(33, 0, 255, 0),
+            DrawAbovePrice = false
+        };
+        private RangeDataSeries _dnCloud = new("Down Cloud")
+        {
+            RangeColor = MColor.FromArgb(33, 255, 0, 0),
+            DrawAbovePrice = false
+        };
 
         private ValueDataSeries _dnTrend = new("Down SuperTrend")
         {
@@ -301,7 +320,7 @@
         // ========================================================================
 
         [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "UseAlerts")]
-        public bool UseAlerts { get; set; }
+        public bool UseAlerts { get; set; } 
         [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "AlertFile")]
         public string AlertFile { get; set; } = "alert1";
 
@@ -315,6 +334,8 @@
         public bool Show_Squeeze_Relax { get => bShowSqueeze; set { bShowSqueeze = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "Show Volume Imbalances", Description = "Show gaps between two candles, indicating market strength")]
         public bool Use_VolumeImbalances { get => bVolumeImbalances; set { bVolumeImbalances = value; RecalculateValues(); } }
+        [Display(GroupName = "Extras", Name = "Show Nebula Cloud", Description = "Show cloud containing KAMA 9 and 21")]
+        public bool Use_Cloud { get => bShowCloud; set { bShowCloud = value; RecalculateValues(); } }
 
         // ========================================================================
         // =======================    FILTER INDICATORS    ========================
@@ -364,7 +385,7 @@
             {
                 if (value < 1)
                     return;
-                iKAMAPeriod = _kama.EfficiencyRatioPeriod = value;
+                iKAMAPeriod = _kama9.EfficiencyRatioPeriod = value;
                 RecalculateValues();
             }
         }
@@ -421,6 +442,7 @@
 
             if (bar == 0)
             {
+                DataSeries.ForEach(x => x.Clear());
                 HorizontalLinesTillTouch.Clear();
                 _lastBarCounted = false;
             }
@@ -482,7 +504,8 @@
             // ========================================================================
              
             var ao = ((ValueDataSeries)_ao.DataSeries[0])[bar];
-            var kama = ((ValueDataSeries)_kama.DataSeries[0])[bar];
+            var kama9 = ((ValueDataSeries)_kama9.DataSeries[0])[bar];
+            var kama21 = ((ValueDataSeries)_kama9.DataSeries[0])[bar];
             var m1 = ((ValueDataSeries)_macd.DataSeries[0])[bar];
             var m2 = ((ValueDataSeries)_macd.DataSeries[1])[bar];
             var m3 = ((ValueDataSeries)_macd.DataSeries[2])[bar];
@@ -593,7 +616,7 @@
             // ========================    UP CONDITIONS    ===========================
             // ========================================================================
 
-            if ((candle.Delta < iMinDelta) ||  (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || (x < iMinADX))
+            if ((candle.Delta < iMinDelta) ||  (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama9 && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || (x < iMinADX))
                 bShowUp = false;
 
             if (green && bShowUp)
@@ -603,7 +626,7 @@
             // ========================    DOWN CONDITIONS    =========================
             // ========================================================================
 
-            if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) ||             (value > kama && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (x < iMinADX))
+            if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) ||             (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (x < iMinADX))
                 bShowDown = false;
 
             if (red && bShowDown)
@@ -632,25 +655,39 @@
 
             var waddah = Math.Min(Math.Abs(t1) + 70, 255);
             if (canColor == 2) // (bWaddahCandles)
-                _paintBars[bar] = t1 > 0 ? System.Windows.Media.Color.FromArgb(255, 0, (byte)waddah, 0) : System.Windows.Media.Color.FromArgb(255, (byte)waddah, 0, 0);
+                _paintBars[bar] = t1 > 0 ? MColor.FromArgb(255, 0, (byte)waddah, 0) : MColor.FromArgb(255, (byte)waddah, 0, 0);
 
             var filteredSQ = Math.Min(Math.Abs(sq1 * 25), 255);
             if (canColor == 3) // (bSqueezeCandles)
-                _paintBars[bar] = sq1 > 0 ? System.Windows.Media.Color.FromArgb(255, 0, (byte)filteredSQ, 0) : System.Windows.Media.Color.FromArgb(255, (byte)filteredSQ, 0, 0);
+                _paintBars[bar] = sq1 > 0 ? MColor.FromArgb(255, 0, (byte)filteredSQ, 0) : MColor.FromArgb(255, (byte)filteredSQ, 0, 0);
 
             var filteredDelta = Math.Min(Math.Abs(candle.Delta), 255);
             if (canColor == 4) // (bDeltaCandles)
-                _paintBars[bar] = candle.Delta > 0 ? System.Windows.Media.Color.FromArgb(255, 0, (byte)filteredDelta, 0) : System.Windows.Media.Color.FromArgb(255, (byte)filteredDelta, 0, 0);
+                _paintBars[bar] = candle.Delta > 0 ? MColor.FromArgb(255, 0, (byte)filteredDelta, 0) : MColor.FromArgb(255, (byte)filteredDelta, 0, 0);
 
             // ========================================================================
             // =======================    REVERSAL PATTERNS    ========================
             // ========================================================================
-
+             
             // _paintBars[bar] = Colors.Yellow;
             if (ThreeOutUp && bShowRevPattern)
                 DrawText(bar, "3oU", Color.Yellow, Color.Transparent);
             if (ThreeOutDown && bShowRevPattern)
                 DrawText(bar, "3oD", Color.Yellow, Color.Transparent);
+
+            // Nebula cloud
+            if (bShowCloud)
+                if (_kama9[bar] > _kama21[bar])
+                {
+                    _upCloud[bar].Upper = _kama9[bar];
+                    _upCloud[bar].Lower = _kama21[bar];
+                }
+                else
+                {
+                    _dnCloud[bar].Upper = _kama21[bar];
+                    _dnCloud[bar].Lower = _kama9[bar];
+                }
+
 
         }
 
