@@ -19,7 +19,7 @@
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.21";
+        private const String sVersion = "1.22";
 
         private class candleColor : Collection<Entity>
         {
@@ -65,6 +65,7 @@
         private bool bUseKAMA = false;
         private bool bUseMyEMA = false;
         private bool bShowTramp = true;
+        private bool bShowHOT = true;
 
         private int iWaddaSensitivity = 120;
 
@@ -276,11 +277,6 @@
         // ====================    EXTRA INDICATORS / ALERTS   ====================
         // ========================================================================
 
-        [Display(Name = "Extras", GroupName = "HOT alert threshold")]
-        [Range(0, 90000)]
-        public int BigTrades
-        { get => iBigTrades; set { iBigTrades = value; RecalculateValues(); } }
-
         [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "UseAlerts")]
         public bool UseAlerts { get; set; }
         [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "AlertFile")]
@@ -300,6 +296,13 @@
         public bool Use_Cloud { get => bShowCloud; set { bShowCloud = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "Show Trampoline", Description = "Trampoline is the ultimate reversal indicator")]
         public bool Use_Tramp { get => bShowTramp; set { bShowTramp = value; RecalculateValues(); } }
+
+        [Display(GroupName = "Extras", Name = "Show HOT bubble alerts")]
+        public bool Use_HOT { get => bShowHOT; set { bShowHOT = value; RecalculateValues(); } }
+        [Display(GroupName = "Extras", Name = "HOT alert threshold")]
+        [Range(0, 90000)]
+        public int BigTrades
+        { get => iBigTrades; set { iBigTrades = value; RecalculateValues(); } }
 
         // ========================================================================
         // =======================    FILTER INDICATORS    ========================
@@ -665,13 +668,13 @@
                     DrawText(bar - 2, "T", Color.Yellow, Color.BlueViolet);
             }
 
+            // HOT signal
             var candleSeconds = Convert.ToDecimal((candle.LastTime - candle.Time).TotalSeconds);
-            if (candleSeconds is 0)
-                candleSeconds = 1;
+            if (candleSeconds is 0) candleSeconds = 1;
             var volPerSecond = candle.Volume / candleSeconds;
             var deltaPer1 = candle.Delta > 0 ? (candle.Delta / candle.MaxDelta) : (candle.Delta / candle.MinDelta);
             var deltaIntense = Math.Abs((candle.Delta * deltaPer1) * (candle.Volume / candleSeconds));
-            if (deltaIntense > iBigTrades && candle.Delta > 350 && candle.Close > 0) 
+            if (deltaIntense > iBigTrades && candle.Delta > 350 && candle.Close > 0 && bShowHOT) 
                 DrawText(bar, "HOT", Color.Yellow, Color.Red, true);
 
         }
