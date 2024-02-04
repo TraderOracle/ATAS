@@ -5,21 +5,10 @@
     using System.ComponentModel;
     using System.ComponentModel.DataAnnotations;
     using System.Drawing;
-    using System.Globalization;
-    using System.Reflection;
-    using System.Resources;
-    using System.Runtime.Intrinsics.X86;
-    using System.Security.Principal;
-    using System.Windows.Media;
     using ATAS.Indicators;
     using ATAS.Indicators.Drawing;
-    using ATAS.Indicators.Other;
     using ATAS.Indicators.Technical.Properties;
-    using OFT.Attributes;
     using OFT.Attributes.Editors;
-    using OFT.Rendering.Context;
-    using OFT.Rendering.Settings;
-    using OFT.Rendering.Tools;
     using static ATAS.Indicators.Technical.BarTimer;
     using static ATAS.Indicators.Technical.SampleProperties;
 
@@ -30,7 +19,7 @@
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.19";
+        private const String sVersion = "1.20";
 
         private class candleColor : Collection<Entity>
         {
@@ -45,7 +34,7 @@
         }
         [Display(Name = "Candle Color", GroupName = "Colored Candles")]
         [ComboBoxEditor(typeof(candleColor), DisplayMember = nameof(Entity.Name), ValueMember = nameof(Entity.Value))]
-        public int canColor 
+        public int canColor
         {
             get => CandleColoring;
             set
@@ -75,6 +64,7 @@
         private bool bUseMyEMA = false;
         private bool bUsePSAR = true;
         private bool bVolumeImbalances = true;
+        private bool bShowTramp = false;
 
         private int iWaddaSensitivity = 120;
 
@@ -147,25 +137,11 @@
             AddText("Aver" + bBar, strX, true, bBar, loc, cI, cB, iFontSize, DrawingText.TextAlign.Center);
         }
 
-        protected override void OnRender(RenderContext context, DrawingLayouts layout)
-        {
-/*
-            if (bShowRevPattern)
-            {
-                foreach (int bbb in Cross921)
-                    DrawText(bbb, "X", context, Color.Yellow, Color.DarkBlue);
-                foreach (int bbb in Out3U)
-                    DrawText(bbb, "3U", context, Color.White, Color.DarkBlue);
-                foreach (int bbb in Out3D)
-                    DrawText(bbb, "3D", context, Color.White, Color.DarkBlue);
-            }
-*/
-        }
-
         // ========================================================================
         // ==========================    INDICATORS    ============================
         // ========================================================================
 
+        private readonly RSI _rsi = new() { Period = 14 };
         private readonly ATR _atr = new() { Period = 14 };
         private readonly AwesomeOscillator _ao = new AwesomeOscillator();
         private readonly ParabolicSAR _psar = new ParabolicSAR();
@@ -180,7 +156,7 @@
         private readonly SuperTrend _st2 = new SuperTrend() { Period = 11, Multiplier = 2m };
         private readonly SuperTrend _st3 = new SuperTrend() { Period = 12, Multiplier = 3m };
 
-        private readonly BollingerBands _bb = new BollingerBands() 
+        private readonly BollingerBands _bb = new BollingerBands()
         {
             Period = 20, Shift = 0, Width = 2
         };
@@ -191,10 +167,6 @@
         private readonly KAMA _kama21 = new KAMA()
         {
             ShortPeriod = 2, LongPeriod = 105, EfficiencyRatioPeriod = 21
-        };
-        private readonly SchaffTrendCycle _stc = new SchaffTrendCycle()
-        {
-            Period = 10, ShortPeriod = 23, LongPeriod = 50
         };
         private readonly MACD _macd = new MACD()
         {
@@ -284,23 +256,6 @@
 
         [Display(GroupName = "Colored Candles", Name = "Show Reversal Patterns")]
         public bool ShowRevPattern { get => bShowRevPattern; set { bShowRevPattern = value; RecalculateValues(); } }
-        /*
-                [Display(GroupName = "Colored Candles", Name = "Use Squeeze Candles")]
-                public bool Use_Squeeze_Candles
-                {
-                    get => bSqueezeCandles; set { bSqueezeCandles = value; RecalculateValues(); }
-                }
-                [Display(GroupName = "Colored Candles", Name = "Use Delta Candles")]
-                public bool Use_Delta_Candles
-                {
-                    get => bDeltaCandles; set { bDeltaCandles = value; RecalculateValues(); }
-                }
-                [Display(GroupName = "Colored Candles", Name = "Use Waddah Candles")]
-                public bool Use_Waddah_Candles
-                {
-                    get => bWaddahCandles; set { bWaddahCandles = value; RecalculateValues(); }
-                }
-        */
         [Display(GroupName = "Colored Candles", Name = "Waddah Sensitivity")]
         [Range(0, 9000)]
         public int WaddaSensitivity
@@ -320,7 +275,7 @@
         // ========================================================================
 
         [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "UseAlerts")]
-        public bool UseAlerts { get; set; } 
+        public bool UseAlerts { get; set; }
         [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "AlertFile")]
         public string AlertFile { get; set; } = "alert1";
 
@@ -332,10 +287,12 @@
         public bool Show_9_21_EMA_Cross { get => bShow921; set { bShow921 = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "Show Squeeze Relaxer")]
         public bool Show_Squeeze_Relax { get => bShowSqueeze; set { bShowSqueeze = value; RecalculateValues(); } }
-        [Display(GroupName = "Extras", Name = "Show Volume Imbalances", Description = "Show gaps between two candles, indicating market strength")]
+        [Display(GroupName = "Extras", Name = "Show Volume Imbalances", Description = "Show gaps between two candles, indicating market strength")] 
         public bool Use_VolumeImbalances { get => bVolumeImbalances; set { bVolumeImbalances = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "Show Nebula Cloud", Description = "Show cloud containing KAMA 9 and 21")]
         public bool Use_Cloud { get => bShowCloud; set { bShowCloud = value; RecalculateValues(); } }
+        [Display(GroupName = "Extras", Name = "Show Trampoline", Description = "Trampoline is the ultimate reversal indicator")]
+        public bool Use_Tramp { get => bShowTramp; set { bShowTramp = value; RecalculateValues(); } }
 
         // ========================================================================
         // =======================    FILTER INDICATORS    ========================
@@ -493,16 +450,16 @@
             slowEma.Calculate(bar, value);
             _9.Calculate(bar, value);
             _21.Calculate(bar, value);
-            _stc.Calculate(bar, value);
             _macd.Calculate(bar, value);
             _bb.Calculate(bar, value);
+            _rsi.Calculate(bar, value);
 
             var deltaPer = candle.Delta > 0 ? (candle.Delta / candle.MaxDelta) * 100 : (candle.Delta / candle.MinDelta) * 100;
 
             // ========================================================================
             // ========================    SERIES FETCH    ============================
             // ========================================================================
-             
+
             var ao = ((ValueDataSeries)_ao.DataSeries[0])[bar];
             var kama9 = ((ValueDataSeries)_kama9.DataSeries[0])[bar];
             var kama21 = ((ValueDataSeries)_kama9.DataSeries[0])[bar];
@@ -533,34 +490,36 @@
             var prev_nn = ((ValueDataSeries)_9.DataSeries[0])[bar - 1];
             var twone = ((ValueDataSeries)_21.DataSeries[0])[bar];
             var prev_twone = ((ValueDataSeries)_21.DataSeries[0])[bar - 1];
-            var stc1 = ((ValueDataSeries)_stc.DataSeries[0])[bar];
             var myema = ((ValueDataSeries)_myEMA.DataSeries[0])[bar];
             var psar = ((ValueDataSeries)_psar.DataSeries[0])[bar];
-            var bb1 = ((ValueDataSeries)_bb.DataSeries[0])[bar]; // mid
-            var bb2 = ((ValueDataSeries)_bb.DataSeries[1])[bar]; // top
-            var bb3 = ((ValueDataSeries)_bb.DataSeries[2])[bar]; // bottom
+            var bb_mid = ((ValueDataSeries)_bb.DataSeries[0])[bar]; // mid
+            var bb_top = ((ValueDataSeries)_bb.DataSeries[1])[bar]; // top
+            var bb_bottom = ((ValueDataSeries)_bb.DataSeries[2])[bar]; // bottom
+            var rsi = ((ValueDataSeries)_rsi.DataSeries[0])[bar];
+            var rsi1 = ((ValueDataSeries)_rsi.DataSeries[0])[bar - 1];
+            var rsi2 = ((ValueDataSeries)_rsi.DataSeries[0])[bar - 2];
 
-            var eqHigh = c0R && c1G && c2G && c3G && p1C.Close > p2C.Close && p2C.Close > p3C.Close && candle.High > bb2 && p1C.High > bb2 && (p1C.Close == candle.Open || p1C.Close == candle.Open + te || p1C.Close + te == candle.Open);
+            var eqHigh = c0R && c1G && c2G && c3G && p1C.Close > p2C.Close && p2C.Close > p3C.Close && candle.High > bb_top && p1C.High > bb_top && (p1C.Close == candle.Open || p1C.Close == candle.Open + te || p1C.Close + te == candle.Open);
 
-            var eqLow = c0G && c1R && c2R && c3R && p1C.Close < p2C.Close && p2C.Close < p3C.Close && candle.Low < bb3 && p1C.Low < bb3 && (p1C.Open == candle.Close || p1C.Open + te == candle.Close || p1C.Open == candle.Close + te);
+            var eqLow = c0G && c1R && c2R && c3R && p1C.Close < p2C.Close && p2C.Close < p3C.Close && candle.Low < bb_bottom && p1C.Low < bb_bottom && (p1C.Open == candle.Close || p1C.Open + te == candle.Close || p1C.Open == candle.Close + te);
 
             var t1 = ((fast - slow) - (fastM - slowM)) * iWaddaSensitivity;
-             
+
             var fisherUp = (f1 < f2);
             var fisherDown = (f2 < f1);
             var macdUp = (m1 > m2);
             var macdDown = (m1 < m2);
             var psarBuy = (psar < candle.Close);
             var psarSell = (psar > candle.Close);
-            
+
             // ========================================================================
             // ====================    SHOW/OTHER CONDITIONS    =======================
             // ========================================================================
 
             if (c4Body > c3Body && c3Body > c2Body && c2Body > c1Body && c1Body > c0Body && bAdvanced)
-                if ((candle.Close > p1C.Close && p1C.Close > p2C.Close && p2C.Close > p3C.Close) || 
+                if ((candle.Close > p1C.Close && p1C.Close > p2C.Close && p2C.Close > p3C.Close) ||
                 (candle.Close < p1C.Close && p1C.Close < p2C.Close && p2C.Close < p3C.Close))
-                        DrawText(bar, "Stairs", Color.Yellow, Color.Transparent);
+                    DrawText(bar, "Stairs", Color.Yellow, Color.Transparent);
 
             if (deltaPer < iMinDeltaPercent)
             {
@@ -570,7 +529,7 @@
 
             var atr = _atr[bar];
             var median = (candle.Low + candle.High) / 2;
-            var dUpperLevel = median + atr * 1.7m; 
+            var dUpperLevel = median + atr * 1.7m;
             var dLowerLevel = median - atr * 1.7m;
 
             if (bShowTripleSupertrend)
@@ -603,9 +562,9 @@
             }
 
             if (eqHigh && bAdvanced)
-                DrawText(bar-1, "Equal\nHigh", Color.Yellow, Color.Transparent);
+                DrawText(bar - 1, "Equal\nHigh", Color.Yellow, Color.Transparent);
             if (eqLow && bAdvanced)
-                DrawText(bar-1, "Equal\nLow", Color.Yellow, Color.Transparent);
+                DrawText(bar - 1, "Equal\nLow", Color.Yellow, Color.Transparent);
 
             if (c0G && c1R && c2R && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta < 0 && bAdvanced)
                 DrawText(bar, "Vol Rev", Color.Lime, Color.Transparent, true);
@@ -616,7 +575,7 @@
             // ========================    UP CONDITIONS    ===========================
             // ========================================================================
 
-            if ((candle.Delta < iMinDelta) ||  (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama9 && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || (x < iMinADX))
+            if ((candle.Delta < iMinDelta) || (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama9 && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || (x < iMinADX))
                 bShowUp = false;
 
             if (green && bShowUp)
@@ -626,7 +585,7 @@
             // ========================    DOWN CONDITIONS    =========================
             // ========================================================================
 
-            if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) ||             (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (x < iMinADX))
+            if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) || (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (x < iMinADX))
                 bShowDown = false;
 
             if (red && bShowDown)
@@ -668,7 +627,7 @@
             // ========================================================================
             // =======================    REVERSAL PATTERNS    ========================
             // ========================================================================
-             
+
             // _paintBars[bar] = Colors.Yellow;
             if (ThreeOutUp && bShowRevPattern)
                 DrawText(bar, "3oU", Color.Yellow, Color.Transparent);
@@ -688,7 +647,18 @@
                     _dnCloud[bar].Lower = _kama9[bar];
                 }
 
+            // Trampoline
+            if (bShowTramp)
+            {
+                if (c0R && c1R && candle.Close < p1C.Close && (rsi >=70 || rsi1 >= 70 || rsi2 >= 70) &&
+                    c2G && p2C.High >= (bb_top - (InstrumentInfo.TickSize * 30)))
+                    DrawText(bar, "T", Color.Yellow, Color.BlueViolet, true);
+                if (c0G && c1G && candle.Close > p1C.Close && (rsi < 25 || rsi1 < 25 || rsi2 < 25) &&
+                    c2R && p2C.Low <= (bb_bottom + (InstrumentInfo.TickSize * 30)))
+                    DrawText(bar - 2, "T", Color.Yellow, Color.BlueViolet);
+            }
 
+            //DrawText(bar, bar.ToString(), Color.Yellow, Color.Transparent, true);
         }
 
     }
