@@ -617,7 +617,7 @@
             if ((candle.Delta < iMinDelta) || (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama9 && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || (x < iMinADX))
                 bShowUp = false;
 
-            if (green && bShowUp)
+            if (green && bShowUp && candle.Close > 0)
                 _posSeries[bar] = candle.Low - InstrumentInfo.TickSize * 2;
 
             // ========================================================================
@@ -627,7 +627,7 @@
             if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) || (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (x < iMinADX))
                 bShowDown = false;
 
-            if (red && bShowDown)
+            if (red && bShowDown && candle.Close > 0)
                 _negSeries[bar] = candle.High + InstrumentInfo.TickSize * 2;
 
             if (_lastBar != bar)
