@@ -19,7 +19,7 @@
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.20";
+        private const String sVersion = "1.21";
 
         private class candleColor : Collection<Entity>
         {
@@ -64,7 +64,7 @@
         private bool bUseMACD = false;
         private bool bUseKAMA = false;
         private bool bUseMyEMA = false;
-        private bool bShowTramp = false;
+        private bool bShowTramp = true;
 
         private int iWaddaSensitivity = 120;
 
@@ -86,6 +86,7 @@
         private int iOffset = 9;
         private int iFontSize = 10;
         private int CandleColoring = 0;
+        private int iBigTrades = 25000;
 
         protected override void OnApplyDefaultColors()
         {
@@ -274,6 +275,11 @@
         // ========================================================================
         // ====================    EXTRA INDICATORS / ALERTS   ====================
         // ========================================================================
+
+        [Display(Name = "Extras", GroupName = "HOT alert threshold")]
+        [Range(0, 90000)]
+        public int BigTrades
+        { get => iBigTrades; set { iBigTrades = value; RecalculateValues(); } }
 
         [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "UseAlerts")]
         public bool UseAlerts { get; set; }
@@ -651,7 +657,7 @@
             // Trampoline
             if (bShowTramp)
             {
-                if (c0R && c1R && candle.Close < p1C.Close && (rsi >=70 || rsi1 >= 70 || rsi2 >= 70) &&
+                if (c0R && c1R && candle.Close < p1C.Close && (rsi >= 70 || rsi1 >= 70 || rsi2 >= 70) &&
                     c2G && p2C.High >= (bb_top - (InstrumentInfo.TickSize * 30)))
                     DrawText(bar, "T", Color.Yellow, Color.BlueViolet, true);
                 if (c0G && c1G && candle.Close > p1C.Close && (rsi < 25 || rsi1 < 25 || rsi2 < 25) &&
@@ -659,7 +665,15 @@
                     DrawText(bar - 2, "T", Color.Yellow, Color.BlueViolet);
             }
 
-            //DrawText(bar, bar.ToString(), Color.Yellow, Color.Transparent, true);
+            var candleSeconds = Convert.ToDecimal((candle.LastTime - candle.Time).TotalSeconds);
+            if (candleSeconds is 0)
+                candleSeconds = 1;
+            var volPerSecond = candle.Volume / candleSeconds;
+            var deltaPer1 = candle.Delta > 0 ? (candle.Delta / candle.MaxDelta) : (candle.Delta / candle.MinDelta);
+            var deltaIntense = Math.Abs((candle.Delta * deltaPer1) * (candle.Volume / candleSeconds));
+            if (deltaIntense > iBigTrades && candle.Delta > 350 && candle.Close > 0) 
+                DrawText(bar, "HOT", Color.Yellow, Color.Red, true);
+
         }
 
     }
