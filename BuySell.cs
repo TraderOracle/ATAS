@@ -19,7 +19,7 @@
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.22";
+        private const String sVersion = "1.23";
 
         private class candleColor : Collection<Entity>
         {
@@ -112,6 +112,7 @@
             DataSeries.Add(_upTrend);
             DataSeries.Add(_upCloud);
             DataSeries.Add(_dnCloud);
+            DataSeries.Add(_kamanine);
 
             Add(_ao);
             Add(_ft);
@@ -124,6 +125,26 @@
             Add(_kama9);
             Add(_kama21);
             Add(_atr);
+        }
+
+        private Color AMD(int bar)
+        {
+            var candle = GetCandle(bar);
+            var diff = InstrumentInfo.TimeZone;
+            var time = candle.Time.AddHours(diff);
+
+            // Distribution
+            if (
+                (time.Hour == 9 && time.Minute >= 11 && time.Minute <= 47) ||
+                (time.Hour == 10 && time.Minute >= 26 && time.Minute <= 50) ||
+                (time.Hour == 11 && time.Minute >= 19 && time.Minute <= 37) ||
+                (time.Hour == 12 && time.Minute >= 07 && time.Minute <= 25)
+                )
+            {
+                return Color.FromArgb(230, 0, 255, 0); 
+            }
+
+            return Color.FromArgb(100, 244, 252, 0);
         }
 
         protected void DrawText(int bBar, String strX, Color cI, Color cB, bool bOverride = false)
@@ -165,11 +186,11 @@
         };
         private readonly KAMA _kama9 = new KAMA()
         {
-            ShortPeriod = 2, LongPeriod = 105, EfficiencyRatioPeriod = 9
+            ShortPeriod = 2, LongPeriod = 109, EfficiencyRatioPeriod = 9
         };
         private readonly KAMA _kama21 = new KAMA()
         {
-            ShortPeriod = 2, LongPeriod = 105, EfficiencyRatioPeriod = 21
+            ShortPeriod = 2, LongPeriod = 109, EfficiencyRatioPeriod = 21
         };
         private readonly MACD _macd = new MACD()
         {
@@ -201,6 +222,13 @@
         // ========================================================================
         // =========================    DATA SERIES    ============================
         // ========================================================================
+
+        private ValueDataSeries _kamanine = new("KAMA NINE")
+        {
+            VisualType = VisualMode.Line,
+            Color = DefaultColors.Yellow.Convert(),
+            Width = 5
+        };
 
         private RangeDataSeries _upCloud = new("Up Cloud")
         {
@@ -471,6 +499,7 @@
             // ========================================================================
 
             var ao = ((ValueDataSeries)_ao.DataSeries[0])[bar];
+            ((ValueDataSeries)_kama9.DataSeries[0]).LineDashStyle = OFT.Rendering.Settings.LineDashStyle.Solid;
             var kama9 = ((ValueDataSeries)_kama9.DataSeries[0])[bar];
             var kama21 = ((ValueDataSeries)_kama9.DataSeries[0])[bar];
             var m1 = ((ValueDataSeries)_macd.DataSeries[0])[bar];
@@ -676,6 +705,10 @@
             var deltaIntense = Math.Abs((candle.Delta * deltaPer1) * (candle.Volume / candleSeconds));
             if (deltaIntense > iBigTrades && candle.Delta > 350 && candle.Close > 0 && bShowHOT) 
                 DrawText(bar, "IT", Color.Yellow, Color.Red, true);
+
+            _kamanine.Colors[bar] = AMD(bar);
+            _kamanine.Width = 2;
+            _kamanine[bar] = kama9;
 
         }
 
