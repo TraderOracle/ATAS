@@ -52,18 +52,18 @@
         private int _lastBar = -1;
         private bool _lastBarCounted;
 
-        private bool bAdvanced = true;
         private bool bUseFisher = true;
+        private bool bUseWaddah = true;
         private bool bUseT3 = true;
         private bool bUseSuperTrend = true;
-        private bool bUseSqueeze = false;
-        private bool bUseMACD = false;
-        private bool bUseWaddah = true;
         private bool bUseAO = true;
-        private bool bUseKAMA = false;
-        private bool bUseMyEMA = false;
         private bool bUsePSAR = true;
         private bool bVolumeImbalances = true;
+
+        private bool bUseSqueeze = false;
+        private bool bUseMACD = false;
+        private bool bUseKAMA = false;
+        private bool bUseMyEMA = false;
         private bool bShowTramp = false;
 
         private int iWaddaSensitivity = 120;
@@ -73,6 +73,7 @@
         private bool bShowRevPattern = false;
         private bool bShowTripleSupertrend = false;
         private bool bShowCloud = false;
+        private bool bAdvanced = false;
 
         private bool bShowUp = true;
         private bool bShowDown = true;
