@@ -65,7 +65,7 @@
         private bool bUseKAMA = false;
         private bool bUseMyEMA = false;
         private bool bShowTramp = true;
-        private bool bShowHOT = true;
+        private bool bShowHOT = false;
 
         private int iWaddaSensitivity = 120;
 
@@ -557,9 +557,9 @@
                 _squeezie[bar] = candle.Low - InstrumentInfo.TickSize * 4;
 
             // 9/21 cross show
-            if (nn > twone && prev_nn <= prev_twone && bShow921)
+            if (nn > twone && prev_nn <= prev_twone && bShow921 && candle.Close > 0)
                 DrawText(bar, "X", Color.Yellow, Color.Transparent);
-            if (nn < twone && prev_nn >= prev_twone && bShow921)
+            if (nn < twone && prev_nn >= prev_twone && bShow921 && candle.Close > 0)
                 DrawText(bar, "X", Color.Yellow, Color.Transparent);
 
             if (bVolumeImbalances)
@@ -571,14 +571,14 @@
                     HorizontalLinesTillTouch.Add(new LineTillTouch(bar, candle.Open, highPen));
             }
 
-            if (eqHigh && bAdvanced)
+            if (eqHigh && bAdvanced && candle.Close > 0)
                 DrawText(bar - 1, "Equal\nHigh", Color.Yellow, Color.Transparent);
-            if (eqLow && bAdvanced)
+            if (eqLow && bAdvanced && candle.Close > 0)
                 DrawText(bar - 1, "Equal\nLow", Color.Yellow, Color.Transparent);
 
-            if (c0G && c1R && c2R && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta < 0 && bAdvanced)
+            if (c0G && c1R && c2R && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta < 0 && bAdvanced && candle.Close > 0)
                 DrawText(bar, "Vol Rev", Color.Lime, Color.Transparent, true);
-            if (c0R && c1G && c2G && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta > 0 && bAdvanced)
+            if (c0R && c1G && c2G && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta > 0 && bAdvanced && candle.Close > 0)
                 DrawText(bar, "Vol Rev", Color.Lime, Color.Transparent, true);
 
             // ========================================================================
@@ -639,9 +639,9 @@
             // ========================================================================
 
             // _paintBars[bar] = Colors.Yellow;
-            if (ThreeOutUp && bShowRevPattern)
+            if (ThreeOutUp && bShowRevPattern && candle.Close > 0)
                 DrawText(bar, "3oU", Color.Yellow, Color.Transparent);
-            if (ThreeOutDown && bShowRevPattern)
+            if (ThreeOutDown && bShowRevPattern && candle.Close > 0)
                 DrawText(bar, "3oD", Color.Yellow, Color.Transparent);
 
             // Nebula cloud
@@ -662,10 +662,10 @@
             {
                 if (c0R && c1R && candle.Close < p1C.Close && (rsi >= 70 || rsi1 >= 70 || rsi2 >= 70) &&
                     c2G && p2C.High >= (bb_top - (InstrumentInfo.TickSize * 30)))
-                    DrawText(bar, "T", Color.Yellow, Color.BlueViolet, true);
+                    DrawText(bar, "TR", Color.Yellow, Color.BlueViolet, true);
                 if (c0G && c1G && candle.Close > p1C.Close && (rsi < 25 || rsi1 < 25 || rsi2 < 25) &&
                     c2R && p2C.Low <= (bb_bottom + (InstrumentInfo.TickSize * 30)))
-                    DrawText(bar - 2, "T", Color.Yellow, Color.BlueViolet);
+                    DrawText(bar - 2, "TR", Color.Yellow, Color.BlueViolet);
             }
 
             // HOT signal
@@ -675,7 +675,7 @@
             var deltaPer1 = candle.Delta > 0 ? (candle.Delta / candle.MaxDelta) : (candle.Delta / candle.MinDelta);
             var deltaIntense = Math.Abs((candle.Delta * deltaPer1) * (candle.Volume / candleSeconds));
             if (deltaIntense > iBigTrades && candle.Delta > 350 && candle.Close > 0 && bShowHOT) 
-                DrawText(bar, "HOT", Color.Yellow, Color.Red, true);
+                DrawText(bar, "IT", Color.Yellow, Color.Red, true);
 
         }
 
