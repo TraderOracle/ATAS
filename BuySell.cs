@@ -19,7 +19,7 @@
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.23";
+        private const String sVersion = "1.25";
 
         private class candleColor : Collection<Entity>
         {
@@ -65,7 +65,8 @@
         private bool bUseKAMA = false;
         private bool bUseMyEMA = false;
         private bool bShowTramp = true;
-        private bool bShowHOT = false;
+        private bool bShowIntense = false;
+        private bool bShowAMDKama = false;
 
         private int iWaddaSensitivity = 120;
 
@@ -133,6 +134,17 @@
             var diff = InstrumentInfo.TimeZone;
             var time = candle.Time.AddHours(diff);
 
+            // Manipulation
+            if (
+                (time.Hour == 8 && time.Minute >= 47 && time.Minute <= 59) ||
+                (time.Hour == 9 && time.Minute >= 00 && time.Minute <= 11) ||
+                (time.Hour == 10 && time.Minute >= 10 && time.Minute <= 26) ||
+                (time.Hour == 11 && time.Minute >= 07 && time.Minute <= 19) ||
+                (time.Hour == 11 && time.Minute >= 55 && time.Minute <= 59) ||
+                (time.Hour == 12 && time.Minute >= 00 && time.Minute <= 07)
+                )
+                return Color.FromArgb(220, 255, 0, 0);
+
             // Distribution
             if (
                 (time.Hour == 9 && time.Minute >= 11 && time.Minute <= 47) ||
@@ -140,9 +152,7 @@
                 (time.Hour == 11 && time.Minute >= 19 && time.Minute <= 37) ||
                 (time.Hour == 12 && time.Minute >= 07 && time.Minute <= 25)
                 )
-            {
                 return Color.FromArgb(230, 0, 255, 0); 
-            }
 
             return Color.FromArgb(100, 244, 252, 0);
         }
@@ -325,8 +335,10 @@
         [Display(GroupName = "Extras", Name = "Show Trampoline", Description = "Trampoline is the ultimate reversal indicator")]
         public bool Use_Tramp { get => bShowTramp; set { bShowTramp = value; RecalculateValues(); } }
 
-        [Display(GroupName = "Extras", Name = "Show HOT bubble alerts")]
-        public bool Use_HOT { get => bShowHOT; set { bShowHOT = value; RecalculateValues(); } }
+        [Display(GroupName = "Extras", Name = "Show AMD zone KAMA")]
+        public bool Use_AMDKama { get => bShowAMDKama; set { bShowAMDKama = value; RecalculateValues(); } }
+        [Display(GroupName = "Extras", Name = "Show intensity alerts (IT)")]
+        public bool Use_Intense { get => bShowIntense; set { bShowIntense = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "HOT alert threshold")]
         [Range(0, 90000)]
         public int BigTrades
@@ -703,12 +715,15 @@
             var volPerSecond = candle.Volume / candleSeconds;
             var deltaPer1 = candle.Delta > 0 ? (candle.Delta / candle.MaxDelta) : (candle.Delta / candle.MinDelta);
             var deltaIntense = Math.Abs((candle.Delta * deltaPer1) * (candle.Volume / candleSeconds));
-            if (deltaIntense > iBigTrades && candle.Delta > 350 && candle.Close > 0 && bShowHOT) 
-                DrawText(bar, "IT", Color.Yellow, Color.Red, true);
+            if (deltaIntense > iBigTrades && candle.Delta > 350 && candle.Close > 0 && bShowIntense) 
+                DrawText(bar, "IT", Color.Yellow, Color.Green, true);
 
-            _kamanine.Colors[bar] = AMD(bar);
-            _kamanine.Width = 2;
-            _kamanine[bar] = kama9;
+            if (bShowAMDKama)
+            {
+                _kamanine.Colors[bar] = AMD(bar);
+                _kamanine.Width = 2;
+                _kamanine[bar] = kama9;
+            }
 
         }
 
