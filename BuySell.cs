@@ -5,21 +5,31 @@
     using System.ComponentModel;
     using System.ComponentModel.DataAnnotations;
     using System.Drawing;
+    using System.Net;
     using ATAS.Indicators;
     using ATAS.Indicators.Drawing;
     using ATAS.Indicators.Technical.Properties;
     using OFT.Attributes.Editors;
+    using Newtonsoft.Json.Linq;
+    using static System.Runtime.InteropServices.JavaScript.JSType;
     using static ATAS.Indicators.Technical.BarTimer;
     using static ATAS.Indicators.Technical.SampleProperties;
 
     using Color = System.Drawing.Color;
     using MColor = System.Windows.Media.Color;
     using Pen = System.Drawing.Pen;
+    using String = String;
+    using OFT.Rendering.Context;
+    using OFT.Rendering.Tools;
+    using System.Collections.Immutable;
 
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.25";
+        private const String sVersion = "1.27";
+        private List<string> ls = new List<string>();
+        private bool bNewsProcessed = false;
+        private bool bShowNews = true;
 
         private class candleColor : Collection<Entity>
         {
@@ -91,17 +101,11 @@
         private int CandleColoring = 0;
         private int iBigTrades = 25000;
 
-        protected override void OnApplyDefaultColors()
-        {
-            if (ChartInfo is null)
-                return;
-        }
-
         public BuySell() :
             base(true)
         {
-            // EnableCustomDrawing = true;
-            DenyToChangePanel = true;
+            EnableCustomDrawing = true;
+            //DenyToChangePanel = true;
 
             DataSeries[0] = _posSeries;
             DataSeries.Add(_negSeries);
@@ -127,6 +131,87 @@
             Add(_kama9);
             Add(_kama21);
             Add(_atr);
+        }
+
+        private void ParseStockEvents(String result, int bar)
+        {
+            int iJSONStart = 0;
+            int iJSONEnd = -1;
+            String sFinalText = String.Empty;
+            String sNews = String.Empty;
+
+            try
+            { 
+                iJSONStart = result.IndexOf("window.calendarComponentStates[1] = ");
+                iJSONEnd = result.IndexOf("\"}]}],", iJSONStart); 
+                sFinalText = result.Substring(iJSONStart, iJSONEnd - iJSONStart);
+                sFinalText = sFinalText.Replace("window.calendarComponentStates[1] = ", "");
+                sFinalText += "\"}]}]}";
+                 
+                var jsFile = JObject.Parse(sFinalText);
+                foreach (JToken j3 in (JArray)jsFile["days"])
+                {
+                    JToken j2 = j3.SelectToken("events");
+                    foreach (JToken j in j2)
+                    { 
+                        String name = j["name"].ToString();
+                        String impact = j["impactTitle"].ToString();
+                        String time = j["timeLabel"].ToString();
+                        String actual = j["actual"].ToString();
+                        String previous = j["previous"].ToString();
+                        String forecast = j["forecast"].ToString();
+                        if (impact.Contains("High"))
+                        {
+                            sNews = time + "     " + name;
+                            if (previous.ToString().Trim().Length > 0)
+                                sNews += " (Prev: " + previous + ", Forecast: " + forecast + ")";
+                            ls.Add(sNews);
+                        }                            
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void LoadStock(int bar)
+        {
+            try
+            {
+                HttpWebRequest myRequest = (HttpWebRequest)WebRequest.Create("https://www.forexfactory.com/calendar?day=today");
+                myRequest.Method = "GET";
+                myRequest.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36";
+                WebResponse myResponse = myRequest.GetResponse();
+                StreamReader sr = new StreamReader(myResponse.GetResponseStream(), System.Text.Encoding.UTF8);
+                string result = sr.ReadToEnd();
+                sr.Close();
+                myResponse.Close();
+                ParseStockEvents(result, bar);
+                bNewsProcessed = true;
+            }
+            catch { }
+        }
+
+        protected override void OnRender(RenderContext context, DrawingLayouts layout)
+        {
+            if (! bShowNews)
+                return;
+
+            RenderFont font;
+            Size textSize;
+            int currY = 60;
+
+            font = new RenderFont("Arial", 14);
+            textSize = context.MeasureString("High Impact News Today:", font);
+            context.DrawString("High Impact News Today:", font, Color.Orange, 50, currY);
+            currY += textSize.Height + 10;
+
+            foreach (string s in ls)
+            {
+                font = new RenderFont("Arial", 12);
+                textSize = context.MeasureString(s, font);
+                context.DrawString(s, font, Color.White, 50, currY);
+                currY += textSize.Height;
+            }
         }
 
         private Color AMD(int bar)
@@ -344,6 +429,9 @@
         [Range(0, 90000)]
         public int BigTrades
         { get => iBigTrades; set { iBigTrades = value; RecalculateValues(); } }
+
+        [Display(GroupName = "Extras", Name = "Show today's news")]
+        public bool Show_News { get => bShowNews; set { bShowNews = value; RecalculateValues(); } }
 
         // ========================================================================
         // =======================    FILTER INDICATORS    ========================
@@ -729,6 +817,9 @@
                 _kamanine.Width = 2;
                 _kamanine[bar] = kama9;
             }
+
+            if (! bNewsProcessed && bShowNews)
+                LoadStock(bar);
 
         }
 
