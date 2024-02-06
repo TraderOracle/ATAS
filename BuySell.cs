@@ -67,6 +67,7 @@
         private bool bShowTramp = true;
         private bool bShowIntense = false;
         private bool bShowAMDKama = false;
+        private bool b200Tick = true;
 
         private int iWaddaSensitivity = 120;
 
@@ -335,11 +336,11 @@
         [Display(GroupName = "Extras", Name = "Show Trampoline", Description = "Trampoline is the ultimate reversal indicator")]
         public bool Use_Tramp { get => bShowTramp; set { bShowTramp = value; RecalculateValues(); } }
 
-        [Display(GroupName = "Extras", Name = "Show AMD zone KAMA")]
-        public bool Use_AMDKama { get => bShowAMDKama; set { bShowAMDKama = value; RecalculateValues(); } }
+        [Display(GroupName = "Extras", Name = "2,000 tick mode", Description = "Ensures that the candle is closed before displaying any data if you're on 2,000 ticks")]
+        public bool Use_2kTick { get => b200Tick; set { b200Tick = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "Show intensity alerts (IT)")]
         public bool Use_Intense { get => bShowIntense; set { bShowIntense = value; RecalculateValues(); } }
-        [Display(GroupName = "Extras", Name = "HOT alert threshold")]
+        [Display(GroupName = "Extras", Name = "Intensity alert threshold")]
         [Range(0, 90000)]
         public int BigTrades
         { get => iBigTrades; set { iBigTrades = value; RecalculateValues(); } }
@@ -446,6 +447,7 @@
         protected override void OnCalculate(int bar, decimal value)
         {
             decimal te = InstrumentInfo.TickSize;
+            var r0 = ChartInfo.ChartType;
 
             if (bar == 0)
             {
@@ -456,10 +458,13 @@
             else if (bar < 5)
                 return;
 
+            var candle = GetCandle(bar);
+            if (candle.Ticks < 1900 && b200Tick)
+                return;
+
             bShowDown = true;
             bShowUp = true;
 
-            var candle = GetCandle(bar);
             var red = candle.Close < candle.Open;
             var green = candle.Close > candle.Open;
 
@@ -598,9 +603,9 @@
                 _squeezie[bar] = candle.Low - InstrumentInfo.TickSize * 4;
 
             // 9/21 cross show
-            if (nn > twone && prev_nn <= prev_twone && bShow921 && candle.Close > 0)
+            if (nn > twone && prev_nn <= prev_twone && bShow921)
                 DrawText(bar, "X", Color.Yellow, Color.Transparent);
-            if (nn < twone && prev_nn >= prev_twone && bShow921 && candle.Close > 0)
+            if (nn < twone && prev_nn >= prev_twone && bShow921)
                 DrawText(bar, "X", Color.Yellow, Color.Transparent);
 
             if (bVolumeImbalances)
@@ -611,12 +616,12 @@
                 if (red && c1R && candle.Open < p1C.Close)
                     HorizontalLinesTillTouch.Add(new LineTillTouch(bar, candle.Open, highPen));
             }
-
+/*
             if (eqHigh && bAdvanced && candle.Close > 0)
                 DrawText(bar - 1, "Equal\nHigh", Color.Yellow, Color.Transparent);
             if (eqLow && bAdvanced && candle.Close > 0)
                 DrawText(bar - 1, "Equal\nLow", Color.Yellow, Color.Transparent);
-
+*/
             if (c0G && c1R && c2R && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta < 0 && bAdvanced && candle.Close > 0)
                 DrawText(bar, "Vol Rev", Color.Lime, Color.Transparent, true);
             if (c0R && c1G && c2G && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta > 0 && bAdvanced && candle.Close > 0)
@@ -629,7 +634,7 @@
             if ((candle.Delta < iMinDelta) || (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama9 && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || (x < iMinADX))
                 bShowUp = false;
 
-            if (green && bShowUp && candle.Close > 0)
+            if (green && bShowUp)
                 _posSeries[bar] = candle.Low - InstrumentInfo.TickSize * 2;
 
             // ========================================================================
@@ -639,7 +644,7 @@
             if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) || (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (x < iMinADX))
                 bShowDown = false;
 
-            if (red && bShowDown && candle.Close > 0)
+            if (red && bShowDown)
                 _negSeries[bar] = candle.High + InstrumentInfo.TickSize * 2;
 
             if (_lastBar != bar)
@@ -680,9 +685,9 @@
             // ========================================================================
 
             // _paintBars[bar] = Colors.Yellow;
-            if (ThreeOutUp && bShowRevPattern && candle.Close > 0)
+            if (ThreeOutUp && bShowRevPattern)
                 DrawText(bar, "3oU", Color.Yellow, Color.Transparent);
-            if (ThreeOutDown && bShowRevPattern && candle.Close > 0)
+            if (ThreeOutDown && bShowRevPattern)
                 DrawText(bar, "3oD", Color.Yellow, Color.Transparent);
 
             // Nebula cloud
@@ -715,10 +720,10 @@
             var volPerSecond = candle.Volume / candleSeconds;
             var deltaPer1 = candle.Delta > 0 ? (candle.Delta / candle.MaxDelta) : (candle.Delta / candle.MinDelta);
             var deltaIntense = Math.Abs((candle.Delta * deltaPer1) * (candle.Volume / candleSeconds));
-            if (deltaIntense > iBigTrades && candle.Delta > 350 && candle.Close > 0 && bShowIntense) 
+            if (deltaIntense > iBigTrades && candle.Delta > 350 && bShowIntense) 
                 DrawText(bar, "IT", Color.Yellow, Color.Green, true);
 
-            if (bShowAMDKama)
+            if (bShowAMDKama && false)
             {
                 _kamanine.Colors[bar] = AMD(bar);
                 _kamanine.Width = 2;
