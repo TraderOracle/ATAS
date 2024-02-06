@@ -202,14 +202,14 @@
 
             font = new RenderFont("Arial", iNewsFont + 2);
             textSize = context.MeasureString("High Impact News Today:", font);
-            context.DrawString("High Impact News Today:", font, Color.Orange, 50, currY);
+            context.DrawString("High Impact News Today:", font, Color.DarkOrange, 50, currY);
             currY += textSize.Height + 10;
 
             foreach (string s in ls)
             {
                 font = new RenderFont("Arial", iNewsFont);
                 textSize = context.MeasureString(s, font);
-                context.DrawString(s, font, Color.White, 50, currY);
+                context.DrawString(s, font, Color.LightGray, 50, currY);
                 currY += textSize.Height;
             }
         }
