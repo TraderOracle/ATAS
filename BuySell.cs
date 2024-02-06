@@ -11,6 +11,9 @@
     using ATAS.Indicators.Technical.Properties;
     using OFT.Attributes.Editors;
     using Newtonsoft.Json.Linq;
+    using System.Collections.Immutable;
+    using OFT.Rendering.Context;
+    using OFT.Rendering.Tools;
     using static System.Runtime.InteropServices.JavaScript.JSType;
     using static ATAS.Indicators.Technical.BarTimer;
     using static ATAS.Indicators.Technical.SampleProperties;
@@ -19,9 +22,6 @@
     using MColor = System.Windows.Media.Color;
     using Pen = System.Drawing.Pen;
     using String = String;
-    using OFT.Rendering.Context;
-    using OFT.Rendering.Tools;
-    using System.Collections.Immutable;
 
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
@@ -69,17 +69,17 @@
         private bool bUseAO = true;
         private bool bUsePSAR = true;
         private bool bVolumeImbalances = true;
-
         private bool bUseSqueeze = false;
         private bool bUseMACD = false;
         private bool bUseKAMA = false;
         private bool bUseMyEMA = false;
+        private bool b200Tick = true;
+
         private bool bShowTramp = true;
         private bool bShowIntense = false;
         private bool bShowAMDKama = false;
-        private bool b200Tick = true;
-
-        private int iWaddaSensitivity = 120;
+        private bool bShowUp = true;
+        private bool bShowDown = true;
 
         private bool bShow921 = false;
         private bool bShowSqueeze = false;
@@ -88,9 +88,6 @@
         private bool bShowCloud = false;
         private bool bAdvanced = false;
 
-        private bool bShowUp = true;
-        private bool bShowDown = true;
-
         private int iMinDelta = 0;
         private int iMinDeltaPercent = 0;
         private int iMinADX = 0;
@@ -98,8 +95,11 @@
         private int iKAMAPeriod = 9;
         private int iOffset = 9;
         private int iFontSize = 10;
-        private int CandleColoring = 0;
         private int iBigTrades = 25000;
+        private int iNewsFont = 10;
+        private int iWaddaSensitivity = 120;
+
+        private int CandleColoring = 0;
 
         public BuySell() :
             base(true)
@@ -200,14 +200,14 @@
             Size textSize;
             int currY = 60;
 
-            font = new RenderFont("Arial", 14);
+            font = new RenderFont("Arial", iNewsFont + 2);
             textSize = context.MeasureString("High Impact News Today:", font);
             context.DrawString("High Impact News Today:", font, Color.Orange, 50, currY);
             currY += textSize.Height + 10;
 
             foreach (string s in ls)
             {
-                font = new RenderFont("Arial", 12);
+                font = new RenderFont("Arial", iNewsFont);
                 textSize = context.MeasureString(s, font);
                 context.DrawString(s, font, Color.White, 50, currY);
                 currY += textSize.Height;
@@ -430,8 +430,13 @@
         public int BigTrades
         { get => iBigTrades; set { iBigTrades = value; RecalculateValues(); } }
 
-        [Display(GroupName = "Extras", Name = "Show today's news")]
+        [Display(GroupName = "High Impact News", Name = "Show today's news")]
         public bool Show_News { get => bShowNews; set { bShowNews = value; RecalculateValues(); } }
+        [Display(GroupName = "High Impact News", Name = "News font")]
+        [Range(1, 900)]
+        public int NewsFont
+        { get => iNewsFont; set { iNewsFont = value; RecalculateValues(); } }
+
 
         // ========================================================================
         // =======================    FILTER INDICATORS    ========================
