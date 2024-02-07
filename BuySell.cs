@@ -26,35 +26,10 @@
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.27";
+        private const String sVersion = "1.28";
         private List<string> ls = new List<string>();
         private bool bNewsProcessed = false;
         private bool bShowNews = true;
-
-        private class candleColor : Collection<Entity>
-        {
-            public candleColor()
-                : base(new[]
-                {
-                    new Entity { Value = 1, Name = "None" },
-                    new Entity { Value = 2, Name = "Waddah Explosion" },
-                    new Entity { Value = 3, Name = "Squeeze" },
-                    new Entity { Value = 4, Name = "Delta" }
-                }) { }
-        }
-        [Display(Name = "Candle Color", GroupName = "Colored Candles")]
-        [ComboBoxEditor(typeof(candleColor), DisplayMember = nameof(Entity.Name), ValueMember = nameof(Entity.Value))]
-        public int canColor
-        {
-            get => CandleColoring;
-            set
-            {
-                if (value < 0)
-                    return;
-                CandleColoring = value;
-                RecalculateValues();
-            }
-        }
 
         public decimal Decimal { get; set; }
         private readonly PaintbarsDataSeries _paintBars = new("Paint bars");
@@ -73,7 +48,7 @@
         private bool bUseMACD = false;
         private bool bUseKAMA = false;
         private bool bUseMyEMA = false;
-        private bool b200Tick = true;
+        private bool b2000Tick = true;
 
         private bool bShowTramp = true;
         private bool bShowIntense = false;
@@ -243,7 +218,7 @@
             return Color.FromArgb(100, 244, 252, 0);
         }
 
-        protected void DrawText(int bBar, String strX, Color cI, Color cB, bool bOverride = false)
+        protected void DrawText(int bBar, String strX, Color cI, Color cB, bool bOverride = false, bool bSwap = false)
         {
             decimal loc = 0;
 
@@ -252,6 +227,11 @@
                 loc = candle.High + (InstrumentInfo.TickSize * iOffset);
             else
                 loc = candle.Low - (InstrumentInfo.TickSize * iOffset);
+
+            if (candle.Close > candle.Open && bSwap)
+                loc = candle.Low - (InstrumentInfo.TickSize * (iOffset * 2));
+            else if (candle.Close < candle.Open && bSwap)
+                loc = candle.High + (InstrumentInfo.TickSize * iOffset);
 
             var textNumber = $"{ChartInfo.PriceChartContainer.Step:0.00}";
             AddText("Aver" + bBar, strX, true, bBar, loc, cI, cB, iFontSize, DrawingText.TextAlign.Center);
@@ -380,6 +360,31 @@
         // ========================================================================
         // ========================    COLORED CANDLES    =========================
         // ========================================================================
+        private class candleColor : Collection<Entity>
+        {
+            public candleColor()
+                : base(new[]
+                {
+                    new Entity { Value = 1, Name = "None" },
+                    new Entity { Value = 2, Name = "Waddah Explosion" },
+                    new Entity { Value = 3, Name = "Squeeze" },
+                    new Entity { Value = 4, Name = "Delta" }
+                })
+            { }
+        }
+        [Display(Name = "Candle Color", GroupName = "Colored Candles")]
+        [ComboBoxEditor(typeof(candleColor), DisplayMember = nameof(Entity.Name), ValueMember = nameof(Entity.Value))]
+        public int canColor
+        {
+            get => CandleColoring;
+            set
+            {
+                if (value < 0)
+                    return;
+                CandleColoring = value;
+                RecalculateValues();
+            }
+        }
 
         [Display(GroupName = "Colored Candles", Name = "Show Reversal Patterns")]
         public bool ShowRevPattern { get => bShowRevPattern; set { bShowRevPattern = value; RecalculateValues(); } }
@@ -422,7 +427,7 @@
         public bool Use_Tramp { get => bShowTramp; set { bShowTramp = value; RecalculateValues(); } }
 
         [Display(GroupName = "Extras", Name = "2,000 tick mode", Description = "Ensures that the candle is closed before displaying any data if you're on 2,000 ticks")]
-        public bool Use_2kTick { get => b200Tick; set { b200Tick = value; RecalculateValues(); } }
+        public bool Use_2kTick { get => b2000Tick; set { b2000Tick = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "Show intensity alerts (IT)")]
         public bool Use_Intense { get => bShowIntense; set { bShowIntense = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "Intensity alert threshold")]
@@ -539,9 +544,6 @@
 
         protected override void OnCalculate(int bar, decimal value)
         {
-            decimal te = InstrumentInfo.TickSize;
-            var r0 = ChartInfo.ChartType;
-
             if (bar == 0)
             {
                 DataSeries.ForEach(x => x.Clear());
@@ -552,27 +554,38 @@
                 return;
 
             var candle = GetCandle(bar);
-            if (candle.Ticks < 1900 && b200Tick)
+            var red = candle.Close < candle.Open;
+            var green = candle.Close > candle.Open;
+            var p1C = GetCandle(bar - 1);
+            var c1G = p1C.Open < p1C.Close;
+            var c1R = p1C.Open > p1C.Close;
+
+            if (bVolumeImbalances)
+            {
+                var highPen = new Pen(new SolidBrush(Color.RebeccaPurple)) { Width = 2 };
+                if (green && c1G && candle.Open > p1C.Close)
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(bar, candle.Open, highPen));
+                if (red && c1R && candle.Open < p1C.Close)
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(bar, candle.Open, highPen));
+            }
+
+            if (candle.Ticks < 1900 && b2000Tick)
                 return;
 
             bShowDown = true;
             bShowUp = true;
-
-            var red = candle.Close < candle.Open;
-            var green = candle.Close > candle.Open;
+            decimal te = InstrumentInfo.TickSize;
+            var r0 = ChartInfo.ChartType;
 
             var upWick50PerLarger = candle.Close > candle.Open && Math.Abs(candle.High - candle.Close) > Math.Abs(candle.Open - candle.Close);
             var downWick50PerLarger = candle.Close < candle.Open && Math.Abs(candle.Low - candle.Close) > Math.Abs(candle.Open - candle.Close);
 
-            var p1C = GetCandle(bar - 1);
             var p2C = GetCandle(bar - 2);
             var p3C = GetCandle(bar - 3);
             var p4C = GetCandle(bar - 4);
 
             var c0G = candle.Open < candle.Close;
             var c0R = candle.Open > candle.Close;
-            var c1G = p1C.Open < p1C.Close;
-            var c1R = p1C.Open > p1C.Close;
             var c2G = p2C.Open < p2C.Close;
             var c2R = p2C.Open > p2C.Close;
             var c3G = p3C.Open < p3C.Close;
@@ -700,15 +713,6 @@
                 DrawText(bar, "X", Color.Yellow, Color.Transparent);
             if (nn < twone && prev_nn >= prev_twone && bShow921)
                 DrawText(bar, "X", Color.Yellow, Color.Transparent);
-
-            if (bVolumeImbalances)
-            {
-                var highPen = new Pen(new SolidBrush(Color.RebeccaPurple)) { Width = 2 };
-                if (green && c1G && candle.Open > p1C.Close)
-                    HorizontalLinesTillTouch.Add(new LineTillTouch(bar, candle.Open, highPen));
-                if (red && c1R && candle.Open < p1C.Close)
-                    HorizontalLinesTillTouch.Add(new LineTillTouch(bar, candle.Open, highPen));
-            }
 /*
             if (eqHigh && bAdvanced && candle.Close > 0)
                 DrawText(bar - 1, "Equal\nHigh", Color.Yellow, Color.Transparent);
@@ -716,9 +720,9 @@
                 DrawText(bar - 1, "Equal\nLow", Color.Yellow, Color.Transparent);
 */
             if (c0G && c1R && c2R && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta < 0 && bAdvanced && candle.Close > 0)
-                DrawText(bar, "Vol Rev", Color.Lime, Color.Transparent, true);
+                DrawText(bar, "Vol\nRev", Color.Yellow, Color.Transparent, false, true);
             if (c0R && c1G && c2G && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta > 0 && bAdvanced && candle.Close > 0)
-                DrawText(bar, "Vol Rev", Color.Lime, Color.Transparent, true);
+                DrawText(bar, "Vol\nRev", Color.Lime, Color.Transparent, false, true);
 
             // ========================================================================
             // ========================    UP CONDITIONS    ===========================
@@ -801,7 +805,7 @@
             {
                 if (c0R && c1R && candle.Close < p1C.Close && (rsi >= 70 || rsi1 >= 70 || rsi2 >= 70) &&
                     c2G && p2C.High >= (bb_top - (InstrumentInfo.TickSize * 30)))
-                    DrawText(bar, "TR", Color.Yellow, Color.BlueViolet, true);
+                    DrawText(bar, "TR", Color.Yellow, Color.BlueViolet);
                 if (c0G && c1G && candle.Close > p1C.Close && (rsi < 25 || rsi1 < 25 || rsi2 < 25) &&
                     c2R && p2C.Low <= (bb_bottom + (InstrumentInfo.TickSize * 30)))
                     DrawText(bar - 2, "TR", Color.Yellow, Color.BlueViolet);
@@ -814,7 +818,9 @@
             var deltaPer1 = candle.Delta > 0 ? (candle.Delta / candle.MaxDelta) : (candle.Delta / candle.MinDelta);
             var deltaIntense = Math.Abs((candle.Delta * deltaPer1) * (candle.Volume / candleSeconds));
             if (deltaIntense > iBigTrades && candle.Delta > 350 && bShowIntense) 
-                DrawText(bar, "IT", Color.Yellow, Color.Green, true);
+                DrawText(bar, "IT", Color.Yellow, Color.Green);
+            else if (deltaIntense > iBigTrades && candle.Delta < 350 && bShowIntense)
+                DrawText(bar, "IT", Color.Yellow, Color.Red);
 
             if (bShowAMDKama && false)
             {
