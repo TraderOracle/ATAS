@@ -22,14 +22,14 @@
     using MColor = System.Windows.Media.Color;
     using Pen = System.Drawing.Pen;
     using String = String;
+    using ATAS.DataFeedsCore;
+    using System.Reflection.Emit;
 
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.28";
+        private const String sVersion = "1.30";
         private List<string> ls = new List<string>();
-        private bool bNewsProcessed = false;
-        private bool bShowNews = true;
 
         public decimal Decimal { get; set; }
         private readonly PaintbarsDataSeries _paintBars = new("Paint bars");
@@ -48,11 +48,14 @@
         private bool bUseMACD = false;
         private bool bUseKAMA = false;
         private bool bUseMyEMA = false;
-        private bool b2000Tick = true;
+        private bool b2000Tick = false;
 
         private bool bShowTramp = true;
         private bool bShowIntense = false;
         private bool bShowAMDKama = false;
+        private bool bShowPNL = false;
+        private bool bNewsProcessed = false;
+        private bool bShowNews = true;
         private bool bShowUp = true;
         private bool bShowDown = true;
 
@@ -171,6 +174,40 @@
 
         protected override void OnRender(RenderContext context, DrawingLayouts layout)
         {
+            var font2 = new RenderFont("Arial", iNewsFont);
+            int upY = 60;
+            int upX = ChartArea.Width - 400;
+            int iTrades = 0;
+
+            if (TradingManager.Portfolio != null && bShowPNL)
+            {
+                var txt1 = $"Account: {TradingManager.Portfolio.AccountID}";
+                context.DrawString(txt1, font2, Color.Gray, upX, upY);
+                var tsize = context.MeasureString(txt1, font2);
+
+                if (TradingManager.Position != null)
+                {
+                    tsize = context.MeasureString(txt1, font2);
+                    upY += tsize.Height + 10;
+                    txt1 = $"Total PNL: {TradingManager.Position.RealizedPnL}";
+                    if (TradingManager.Position.RealizedPnL > 0)
+                        context.DrawString(txt1, font2, Color.Lime, upX, upY);
+                    else
+                        context.DrawString(txt1, font2, Color.Red, upX, upY);
+                }
+
+                var myTrades = TradingManager.MyTrades;
+                if (myTrades.Any())
+                {
+                    foreach (var myTrade in myTrades)
+                        iTrades++;
+                    tsize = context.MeasureString(txt1, font2);
+                    upY += tsize.Height + 10;
+                    txt1 = $"Total Trades: " + iTrades;
+                    context.DrawString(txt1, font2, Color.Gray, upX, upY);
+                }
+            }
+
             if (! bShowNews)
                 return;
 
@@ -243,11 +280,11 @@
         // ========================================================================
         // ==========================    INDICATORS    ============================
         // ========================================================================
-
+/*
         private readonly FairValueGap _fvg = new() { };
         private readonly BigTrades _bt = new() { };
         private readonly StackedImbalance _simbalance = new() { };
-
+*/
         private readonly RSI _rsi = new() { Period = 14 };
         private readonly ATR _atr = new() { Period = 14 };
         private readonly AwesomeOscillator _ao = new AwesomeOscillator();
@@ -356,12 +393,12 @@
 
         private readonly ValueDataSeries _posWhite = new("BigBuy Signal")
         {
-            Color = System.Windows.Media.Colors.White, VisualType = VisualMode.Dots, Width = 3
+            Color = System.Windows.Media.Colors.White, VisualType = VisualMode.UpArrow, Width = 3
         };
 
         private readonly ValueDataSeries _negWhite = new("BigSell Signal")
         {
-            Color = System.Windows.Media.Colors.White, VisualType = VisualMode.Dots, Width = 3
+            Color = System.Windows.Media.Colors.White, VisualType = VisualMode.DownArrow, Width = 3
         };
 
         // ========================================================================
@@ -448,6 +485,8 @@
         [Range(1, 900)]
         public int NewsFont
         { get => iNewsFont; set { iNewsFont = value; RecalculateValues(); } }
+        [Display(GroupName = "High Impact News", Name = "Show PNL on screen")]
+        public bool Show_PNL { get => bShowPNL; set { bShowPNL = value; RecalculateValues(); } }
 
 
         // ========================================================================
@@ -558,10 +597,11 @@
                 _lastBarCounted = false;
                 return;
             }
-            else if (bar < 5)
+            if (bar < 5)
                 return;
 
             var candle = GetCandle(bar);
+            value = candle.Close;
             var red = candle.Close < candle.Open;
             var green = candle.Close > candle.Open;
             var p1C = GetCandle(bar - 1);
@@ -572,12 +612,18 @@
             {
                 var highPen = new Pen(new SolidBrush(Color.RebeccaPurple)) { Width = 2 };
                 if (green && c1G && candle.Open > p1C.Close)
+                {
                     HorizontalLinesTillTouch.Add(new LineTillTouch(bar, candle.Open, highPen));
+                    _negWhite[bar] = candle.Low - InstrumentInfo.TickSize * 2;
+                }
                 if (red && c1R && candle.Open < p1C.Close)
+                {
                     HorizontalLinesTillTouch.Add(new LineTillTouch(bar, candle.Open, highPen));
+                    _posWhite[bar] = candle.High + InstrumentInfo.TickSize * 2;
+                }
             }
 
-            if (candle.Ticks < 1900 && b2000Tick)
+            if (candle.Ticks < 1800 && b2000Tick)
                 return;
 
             bShowDown = true;
@@ -610,8 +656,6 @@
             var ThreeOutUp = c2R && c1G && c0G && p1C.Open < p2C.Close && p2C.Open < p1C.Close && Math.Abs(p1C.Open - p1C.Close) > Math.Abs(p2C.Open - p2C.Close) && candle.Close > p1C.Low;
 
             var ThreeOutDown = c2G && c1R && c0R && p1C.Open > p2C.Close && p2C.Open > p1C.Close && Math.Abs(p1C.Open - p1C.Close) > Math.Abs(p2C.Open - p2C.Close) && candle.Close < p1C.Low;
-
-            value = candle.Close;
 
             _myEMA.Calculate(bar, value);
             _t3.Calculate(bar, value);
@@ -669,6 +713,7 @@
             var rsi1 = ((ValueDataSeries)_rsi.DataSeries[0])[bar - 1];
             var rsi2 = ((ValueDataSeries)_rsi.DataSeries[0])[bar - 2];
 
+/*
             var stimb = ((ValueDataSeries)_simbalance.DataSeries[0])[bar];
             var fvgL = ((ValueDataSeries)_fvg.DataSeries[0])[bar];
             var bt = ((PriceSelectionDataSeries)_bt.DataSeries[0])[bar];
@@ -677,7 +722,8 @@
             {
                 int sf = 1;
             }
- 
+*/
+
             var eqHigh = c0R && c1G && c2G && c3G && p1C.Close > p2C.Close && p2C.Close > p3C.Close && candle.High > bb_top && p1C.High > bb_top && (p1C.Close == candle.Open || p1C.Close == candle.Open + te || p1C.Close + te == candle.Open);
 
             var eqLow = c0G && c1R && c2R && c3R && p1C.Close < p2C.Close && p2C.Close < p3C.Close && candle.Low < bb_bottom && p1C.Low < bb_bottom && (p1C.Open == candle.Close || p1C.Open + te == candle.Close || p1C.Open == candle.Close + te);
@@ -848,6 +894,8 @@
 
             if (! bNewsProcessed && bShowNews)
                 LoadStock(bar);
+
+
 
         }
 
