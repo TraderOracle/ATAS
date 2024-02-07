@@ -106,6 +106,9 @@
             Add(_kama9);
             Add(_kama21);
             Add(_atr);
+            //Add(_simbalance);
+            //Add(_fvg);
+            //Add(_bt);
         }
 
         private void ParseStockEvents(String result, int bar)
@@ -240,6 +243,10 @@
         // ========================================================================
         // ==========================    INDICATORS    ============================
         // ========================================================================
+
+        private readonly FairValueGap _fvg = new() { };
+        private readonly BigTrades _bt = new() { };
+        private readonly StackedImbalance _simbalance = new() { };
 
         private readonly RSI _rsi = new() { Period = 14 };
         private readonly ATR _atr = new() { Period = 14 };
@@ -549,6 +556,7 @@
                 DataSeries.ForEach(x => x.Clear());
                 HorizontalLinesTillTouch.Clear();
                 _lastBarCounted = false;
+                return;
             }
             else if (bar < 5)
                 return;
@@ -661,6 +669,15 @@
             var rsi1 = ((ValueDataSeries)_rsi.DataSeries[0])[bar - 1];
             var rsi2 = ((ValueDataSeries)_rsi.DataSeries[0])[bar - 2];
 
+            var stimb = ((ValueDataSeries)_simbalance.DataSeries[0])[bar];
+            var fvgL = ((ValueDataSeries)_fvg.DataSeries[0])[bar];
+            var bt = ((PriceSelectionDataSeries)_bt.DataSeries[0])[bar];
+
+            if (bt.Count > 0 || _fvg.HorizontalLinesTillTouch.Count > 0 || _fvg.Rectangles.Count > 0)
+            {
+                int sf = 1;
+            }
+ 
             var eqHigh = c0R && c1G && c2G && c3G && p1C.Close > p2C.Close && p2C.Close > p3C.Close && candle.High > bb_top && p1C.High > bb_top && (p1C.Close == candle.Open || p1C.Close == candle.Open + te || p1C.Close + te == candle.Open);
 
             var eqLow = c0G && c1R && c2R && c3R && p1C.Close < p2C.Close && p2C.Close < p3C.Close && candle.Low < bb_bottom && p1C.Low < bb_bottom && (p1C.Open == candle.Close || p1C.Open + te == candle.Close || p1C.Open == candle.Close + te);
