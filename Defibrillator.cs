@@ -178,7 +178,7 @@
             var time = candle.Time.AddHours(diff);
 
             if ((time.Minute >= 0 && time.Hour >= 17 && time.Hour <= 24) ||
-                (time.Minute >= 0 && time.Hour >= 0 && time.Hour <= 8))
+                (time.Minute >= 0 && time.Hour >= 0 && time.Hour <= 7))
             {
                 if (candle.High > _highest)
                 {
