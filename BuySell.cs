@@ -24,7 +24,7 @@
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.34";
+        private const String sVersion = "1.35";
 
         #region PRIVATE FIELDS
 
@@ -184,8 +184,6 @@
 
         protected override void OnRender(RenderContext context, DrawingLayouts layout)
         {
-            var candle = GetCandle(CurrentBar);
-
             var font2 = new RenderFont("Arial", iNewsFont);
             var fontB = new RenderFont("Arial", iNewsFont, FontStyle.Bold);
             int upY = 50;
@@ -479,8 +477,6 @@
         private decimal VolSec(IndicatorCandle c) { return c.Volume / Convert.ToDecimal((c.LastTime - c.Time).TotalSeconds); }
 
         #endregion
-
-        #region MAIN LOGIC
 
         protected override void OnCalculate(int bar, decimal value)
         {
@@ -798,8 +794,6 @@
 
             if (! bNewsProcessed && bShowNews)
                 LoadStock(pbar);
-
-            #endregion
 
         }
 
