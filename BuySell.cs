@@ -11,11 +11,8 @@
     using ATAS.Indicators.Technical.Properties;
     using OFT.Attributes.Editors;
     using Newtonsoft.Json.Linq;
-    using System.Collections.Immutable;
     using OFT.Rendering.Context;
     using OFT.Rendering.Tools;
-    using static System.Runtime.InteropServices.JavaScript.JSType;
-    using static ATAS.Indicators.Technical.BarTimer;
     using static ATAS.Indicators.Technical.SampleProperties;
 
     using Color = System.Drawing.Color;
@@ -23,13 +20,14 @@
     using MColors = System.Windows.Media.Colors;
     using Pen = System.Drawing.Pen;
     using String = String;
-    using ATAS.DataFeedsCore;
-    using System.Reflection.Emit;
 
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.32";
+        private const String sVersion = "1.34";
+
+        #region PRIVATE FIELDS
+
         private List<string> lsH = new List<string>();
         private List<string> lsM = new List<string>();
 
@@ -83,6 +81,10 @@
         private int iWaddaSensitivity = 120;
         private int CandleColoring = 0;
 
+        #endregion
+
+        #region CONSTRUCTOR
+
         public BuySell() :
             base(true)
         {
@@ -114,6 +116,10 @@
             Add(_kama21);
             Add(_atr);
         }
+
+        #endregion
+
+        #region Stock HTTP Fetch
 
         private void ParseStockEvents(String result, int bar)
         {
@@ -172,8 +178,14 @@
             catch { }
         }
 
+        #endregion
+
+        #region RENDER CONTEXT
+
         protected override void OnRender(RenderContext context, DrawingLayouts layout)
         {
+            var candle = GetCandle(CurrentBar);
+
             var font2 = new RenderFont("Arial", iNewsFont);
             var fontB = new RenderFont("Arial", iNewsFont, FontStyle.Bold);
             int upY = 50;
@@ -284,9 +296,9 @@
             AddText("Aver" + bBar, strX, true, bBar, loc, cI, cB, iFontSize, DrawingText.TextAlign.Center);
         }
 
-        // ========================================================================
-        // ==========================    INDICATORS    ============================
-        // ========================================================================
+        #endregion
+
+        #region INDICATORS
 
         private readonly RSI _rsi = new() { Period = 14 };
         private readonly ATR _atr = new() { Period = 14 };
@@ -309,6 +321,10 @@
         private readonly T3 _t3 = new T3() { Period = 10, Multiplier = 1 };
         private readonly SqueezeMomentum _sq = new SqueezeMomentum() { BBPeriod = 20, BBMultFactor = 2, KCPeriod = 20, KCMultFactor = 1.5m, UseTrueRange = false };
 
+        #endregion
+
+        #region DATA SERIES
+
         [Display(Name = "Font Size", GroupName = "Drawing", Order = int.MaxValue)]
         [Range(1, 90)]
         public int TextFont { get => iFontSize; set { iFontSize = value; RecalculateValues(); } }
@@ -316,10 +332,6 @@
         [Display(Name = "Text Offset", GroupName = "Drawing", Order = int.MaxValue)]
         [Range(0, 900)]
         public int Offset { get => iOffset; set { iOffset = value; RecalculateValues(); } }
-
-        // ========================================================================
-        // =========================    DATA SERIES    ============================
-        // ========================================================================
 
         private ValueDataSeries _kamanine = new("KAMA NINE") { VisualType = VisualMode.Line, Color = DefaultColors.Yellow.Convert(), Width = 5 };
         private RangeDataSeries _upCloud = new("Up Cloud") { RangeColor = MColor.FromArgb(73, 0, 255, 0), DrawAbovePrice = false };
@@ -330,12 +342,13 @@
         private readonly ValueDataSeries _nine21 = new("9 21 cross") { Color = MColor.FromArgb(255, 0, 255, 0), VisualType = VisualMode.Block, Width = 4 };
         private readonly ValueDataSeries _posSeries = new("Regular Buy Signal") { Color = MColor.FromArgb(255, 0, 255, 0), VisualType = VisualMode.Dots, Width = 3 };
         private readonly ValueDataSeries _negSeries = new("Regular Sell Signal") { Color = MColor.FromArgb(255, 255, 0, 0), VisualType = VisualMode.Dots, Width = 3 };
-        private readonly ValueDataSeries _posWhite = new("Vol Imbalance Sell") { Color = MColors.White, VisualType = VisualMode.UpArrow, Width = 3 };
-        private readonly ValueDataSeries _negWhite = new("Vol Imbalance Buy") { Color = MColors.White, VisualType = VisualMode.DownArrow, Width = 3 };
+        private readonly ValueDataSeries _posWhite = new("Vol Imbalance Sell") { Color = MColors.White, VisualType = VisualMode.DownArrow, Width = 1 };
+        private readonly ValueDataSeries _negWhite = new("Vol Imbalance Buy") { Color = MColors.White, VisualType = VisualMode.UpArrow, Width = 1 };
 
-        // ========================================================================
-        // ========================    COLORED CANDLES    =========================
-        // ========================================================================
+        #endregion
+
+        #region SETTINGS
+
         private class candleColor : Collection<Entity>
         {
             public candleColor()
@@ -363,10 +376,6 @@
         {
             get => iWaddaSensitivity; set { if (value < 0) return; iWaddaSensitivity = value; RecalculateValues(); }
         }
-
-        // ========================================================================
-        // ====================    EXTRA INDICATORS / ALERTS   ====================
-        // ========================================================================
 
         [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "UseAlerts")]
         public bool UseAlerts { get; set; }
@@ -407,7 +416,6 @@
         { get => iNewsFont; set { iNewsFont = value; RecalculateValues(); } }
         [Display(GroupName = "High Impact News", Name = "Show PNL on screen")]
         public bool Show_PNL { get => bShowPNL; set { bShowPNL = value; RecalculateValues(); } }
-
 
         // ========================================================================
         // =======================    FILTER INDICATORS    ========================
@@ -470,12 +478,14 @@
 
         private decimal VolSec(IndicatorCandle c) { return c.Volume / Convert.ToDecimal((c.LastTime - c.Time).TotalSeconds); }
 
-        // ========================================================================
-        // =========================    MAIN LOGIC      ===========================
-        // ========================================================================
+        #endregion
+
+        #region MAIN LOGIC
+
         protected override void OnCalculate(int bar, decimal value)
         {
-            var candle = GetCandle(bar);
+            var candle = GetCandle(bar-1);
+            var pbar = bar - 1;
             value = candle.Close;
             var chT = ChartInfo.ChartType;
 
@@ -486,40 +496,24 @@
                 _lastBarCounted = false;
                 return;
             }
-            if (bar < 5)
+            if (bar < 6)
                 return;
 
-            if (chT == "Tick" && bWaitTilClose && candle.Ticks < 1800 && int.Parse(ChartInfo.TimeFrame) == 2000)
-                return;
-
-            decimal _tick = ChartInfo.PriceChartContainer.Step;
-            var red = candle.Close < candle.Open;
-            var green = candle.Close > candle.Open;
-            var p1C = GetCandle(bar - 1);
-            var c1G = p1C.Open < p1C.Close;
-            var c1R = p1C.Open > p1C.Close;
-
-            if (bVolumeImbalances)
-            {
-                var highPen = new Pen(new SolidBrush(Color.RebeccaPurple)) { Width = 2 };
-                if (green && c1G && candle.Open > p1C.Close)
-                {
-                    HorizontalLinesTillTouch.Add(new LineTillTouch(bar, candle.Open, highPen));
-                    _negWhite[bar] = candle.Low - (_tick * 2);
-                }
-                if (red && c1R && candle.Open < p1C.Close)
-                {
-                    HorizontalLinesTillTouch.Add(new LineTillTouch(bar, candle.Open, highPen));
-                    _posWhite[bar] = candle.High + (_tick * 2);
-                }
-            }
+            #region CANDLE CALCULATIONS
 
             bShowDown = true;
             bShowUp = true;
 
-            var p2C = GetCandle(bar - 2);
-            var p3C = GetCandle(bar - 3);
-            var p4C = GetCandle(bar - 4);
+            decimal _tick = ChartInfo.PriceChartContainer.Step;
+            var red = candle.Close < candle.Open;
+            var green = candle.Close > candle.Open;
+            var p1C = GetCandle(bar - 2);
+            var c1G = p1C.Open < p1C.Close;
+            var c1R = p1C.Open > p1C.Close;
+
+            var p2C = GetCandle(bar - 3);
+            var p3C = GetCandle(bar - 4);
+            var p4C = GetCandle(bar - 5);
 
             var c0G = candle.Open < candle.Close;
             var c0R = candle.Open > candle.Close;
@@ -543,60 +537,91 @@
 
             var ThreeOutDown = c2G && c1R && c0R && p1C.Open > p2C.Close && p2C.Open > p1C.Close && Math.Abs(p1C.Open - p1C.Close) > Math.Abs(p2C.Open - p2C.Close) && candle.Close < p1C.Low;
 
-            _myEMA.Calculate(bar, value);
-            _t3.Calculate(bar, value);
-            fastEma.Calculate(bar, value);
-            slowEma.Calculate(bar, value);
-            _9.Calculate(bar, value);
-            _21.Calculate(bar, value);
-            _macd.Calculate(bar, value);
-            _bb.Calculate(bar, value);
-            _rsi.Calculate(bar, value);
+            decimal deltaPer = 0;
+            if (candle.Delta > 0 && candle.MaxDelta > 0)
+            {
+                if (candle.MinDelta > 0)
+                    deltaPer = (candle.Delta / candle.MaxDelta) * 100;
+                else
+                    deltaPer = (candle.Delta / candle.MinDelta) * 100;
+            }
 
-            var deltaPer = candle.Delta > 0 ? (candle.Delta / candle.MaxDelta) * 100 : (candle.Delta / candle.MinDelta) * 100;
+            #endregion
 
-            // ========================================================================
-            // ========================    SERIES FETCH    ============================
-            // ========================================================================
+            #region INDICATORS CALCULATE
 
-            var ao = ((ValueDataSeries)_ao.DataSeries[0])[bar];
-            var kama9 = ((ValueDataSeries)_kama9.DataSeries[0])[bar];
-            var kama21 = ((ValueDataSeries)_kama9.DataSeries[0])[bar];
-            var m1 = ((ValueDataSeries)_macd.DataSeries[0])[bar];
-            var m2 = ((ValueDataSeries)_macd.DataSeries[1])[bar];
-            var m3 = ((ValueDataSeries)_macd.DataSeries[2])[bar];
-            var t3 = ((ValueDataSeries)_t3.DataSeries[0])[bar];
-            var fast = ((ValueDataSeries)fastEma.DataSeries[0])[bar];
-            var fastM = ((ValueDataSeries)fastEma.DataSeries[0])[bar - 1];
-            var slow = ((ValueDataSeries)slowEma.DataSeries[0])[bar];
-            var slowM = ((ValueDataSeries)slowEma.DataSeries[0])[bar - 1];
-            var sq1 = ((ValueDataSeries)_sq.DataSeries[0])[bar];
-            var sq2 = ((ValueDataSeries)_sq.DataSeries[1])[bar];
-            var psq1 = ((ValueDataSeries)_sq.DataSeries[0])[bar - 1];
-            var psq2 = ((ValueDataSeries)_sq.DataSeries[1])[bar - 1];
-            var ppsq1 = ((ValueDataSeries)_sq.DataSeries[0])[bar - 2];
-            var ppsq2 = ((ValueDataSeries)_sq.DataSeries[1])[bar - 2];
-            var f1 = ((ValueDataSeries)_ft.DataSeries[0])[bar];
-            var f2 = ((ValueDataSeries)_ft.DataSeries[1])[bar];
-            var stu1 = ((ValueDataSeries)_st1.DataSeries[0])[bar];
-            var stu2 = ((ValueDataSeries)_st2.DataSeries[0])[bar];
-            var stu3 = ((ValueDataSeries)_st3.DataSeries[0])[bar];
-            var std1 = ((ValueDataSeries)_st1.DataSeries[1])[bar];
-            var std2 = ((ValueDataSeries)_st2.DataSeries[1])[bar];
-            var std3 = ((ValueDataSeries)_st3.DataSeries[1])[bar];
-            var x = ((ValueDataSeries)_adx.DataSeries[0])[bar];
-            var nn = ((ValueDataSeries)_9.DataSeries[0])[bar];
-            var prev_nn = ((ValueDataSeries)_9.DataSeries[0])[bar - 1];
-            var twone = ((ValueDataSeries)_21.DataSeries[0])[bar];
-            var prev_twone = ((ValueDataSeries)_21.DataSeries[0])[bar - 1];
-            var myema = ((ValueDataSeries)_myEMA.DataSeries[0])[bar];
-            var psar = ((ValueDataSeries)_psar.DataSeries[0])[bar];
-            var bb_mid = ((ValueDataSeries)_bb.DataSeries[0])[bar]; // mid
-            var bb_top = ((ValueDataSeries)_bb.DataSeries[1])[bar]; // top
-            var bb_bottom = ((ValueDataSeries)_bb.DataSeries[2])[bar]; // bottom
-            var rsi = ((ValueDataSeries)_rsi.DataSeries[0])[bar];
-            var rsi1 = ((ValueDataSeries)_rsi.DataSeries[0])[bar - 1];
-            var rsi2 = ((ValueDataSeries)_rsi.DataSeries[0])[bar - 2];
+            _myEMA.Calculate(pbar, value);
+            _t3.Calculate(pbar, value);
+            fastEma.Calculate(pbar, value);
+            slowEma.Calculate(pbar, value);
+            _9.Calculate(pbar, value);
+            _21.Calculate(pbar, value);
+            _macd.Calculate(pbar, value);
+            _bb.Calculate(pbar, value);
+            _rsi.Calculate(pbar, value);
+
+            var ao = ((ValueDataSeries)_ao.DataSeries[0])[pbar];
+            var kama9 = ((ValueDataSeries)_kama9.DataSeries[0])[pbar];
+            var kama21 = ((ValueDataSeries)_kama9.DataSeries[0])[pbar];
+            var m1 = ((ValueDataSeries)_macd.DataSeries[0])[pbar];
+            var m2 = ((ValueDataSeries)_macd.DataSeries[1])[pbar];
+            var m3 = ((ValueDataSeries)_macd.DataSeries[2])[pbar];
+            var t3 = ((ValueDataSeries)_t3.DataSeries[0])[pbar];
+            var fast = ((ValueDataSeries)fastEma.DataSeries[0])[pbar];
+            var fastM = ((ValueDataSeries)fastEma.DataSeries[0])[pbar - 1];
+            var slow = ((ValueDataSeries)slowEma.DataSeries[0])[pbar];
+            var slowM = ((ValueDataSeries)slowEma.DataSeries[0])[pbar - 1];
+            var sq1 = ((ValueDataSeries)_sq.DataSeries[0])[pbar];
+            var sq2 = ((ValueDataSeries)_sq.DataSeries[1])[pbar];
+            var psq1 = ((ValueDataSeries)_sq.DataSeries[0])[pbar - 1];
+            var psq2 = ((ValueDataSeries)_sq.DataSeries[1])[pbar - 1];
+            var ppsq1 = ((ValueDataSeries)_sq.DataSeries[0])[pbar - 2];
+            var ppsq2 = ((ValueDataSeries)_sq.DataSeries[1])[pbar - 2];
+            var f1 = ((ValueDataSeries)_ft.DataSeries[0])[pbar];
+            var f2 = ((ValueDataSeries)_ft.DataSeries[1])[pbar];
+            var stu1 = ((ValueDataSeries)_st1.DataSeries[0])[pbar];
+            var stu2 = ((ValueDataSeries)_st2.DataSeries[0])[pbar];
+            var stu3 = ((ValueDataSeries)_st3.DataSeries[0])[pbar];
+            var std1 = ((ValueDataSeries)_st1.DataSeries[1])[pbar];
+            var std2 = ((ValueDataSeries)_st2.DataSeries[1])[pbar];
+            var std3 = ((ValueDataSeries)_st3.DataSeries[1])[pbar];
+            var x = ((ValueDataSeries)_adx.DataSeries[0])[pbar];
+            var nn = ((ValueDataSeries)_9.DataSeries[0])[pbar];
+            var prev_nn = ((ValueDataSeries)_9.DataSeries[0])[pbar - 1];
+            var twone = ((ValueDataSeries)_21.DataSeries[0])[pbar];
+            var prev_twone = ((ValueDataSeries)_21.DataSeries[0])[pbar - 1];
+            var myema = ((ValueDataSeries)_myEMA.DataSeries[0])[pbar];
+            var psar = ((ValueDataSeries)_psar.DataSeries[0])[pbar];
+            var bb_mid = ((ValueDataSeries)_bb.DataSeries[0])[pbar]; // mid
+            var bb_top = ((ValueDataSeries)_bb.DataSeries[1])[pbar]; // top
+            var bb_bottom = ((ValueDataSeries)_bb.DataSeries[2])[pbar]; // bottom
+            var rsi = ((ValueDataSeries)_rsi.DataSeries[0])[pbar];
+            var rsi1 = ((ValueDataSeries)_rsi.DataSeries[0])[pbar - 1];
+            var rsi2 = ((ValueDataSeries)_rsi.DataSeries[0])[pbar - 2];
+
+            var fisherUp = (f1 < f2);
+            var fisherDown = (f2 < f1);
+            var macdUp = (m1 > m2);
+            var macdDown = (m1 < m2);
+            var psarBuy = (psar < candle.Close);
+            var psarSell = (psar > candle.Close);
+
+            #endregion
+
+            if (bVolumeImbalances)
+            {
+                var highPen = new Pen(new SolidBrush(Color.RebeccaPurple)) { Width = 2 };
+                if (green && c1G && candle.Open > p1C.Close)
+                {
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
+                    _negWhite[pbar] = candle.Low - (_tick * 2);
+                }
+                if (red && c1R && candle.Open < p1C.Close)
+                {
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
+                    _posWhite[pbar] = candle.High + (_tick * 2);
+                }
+            }
 
             var eqHigh = c0R && c1R && c2G && c3G &&
                 candle.Close < p1C.Close &&
@@ -608,21 +633,12 @@
 
             var t1 = ((fast - slow) - (fastM - slowM)) * iWaddaSensitivity;
 
-            var fisherUp = (f1 < f2);
-            var fisherDown = (f2 < f1);
-            var macdUp = (m1 > m2);
-            var macdDown = (m1 < m2);
-            var psarBuy = (psar < candle.Close);
-            var psarSell = (psar > candle.Close);
-
-            // ========================================================================
             // ====================    SHOW/OTHER CONDITIONS    =======================
-            // ========================================================================
 
             if (c4Body > c3Body && c3Body > c2Body && c2Body > c1Body && c1Body > c0Body && bAdvanced)
                 if ((candle.Close > p1C.Close && p1C.Close > p2C.Close && p2C.Close > p3C.Close) ||
                 (candle.Close < p1C.Close && p1C.Close < p2C.Close && p2C.Close < p3C.Close))
-                    DrawText(bar, "Stairs", Color.Yellow, Color.Transparent);
+                    DrawText(pbar, "Stairs", Color.Yellow, Color.Transparent);
 
             if (deltaPer < iMinDeltaPercent)
             {
@@ -630,7 +646,7 @@
                 bShowDown = false;
             }
 
-            var atr = _atr[bar];
+            var atr = _atr[pbar];
             var median = (candle.Low + candle.High) / 2;
             var dUpperLevel = median + atr * 1.7m;
             var dLowerLevel = median - atr * 1.7m;
@@ -638,52 +654,48 @@
             if (bShowTripleSupertrend)
             {
                 if ((std1 != 0 && std2 != 0) || (std3 != 0 && std2 != 0) || (std3 != 0 && std1 != 0))
-                    _dnTrend[bar] = dUpperLevel;
+                    _dnTrend[pbar] = dUpperLevel;
                 else if ((stu1 != 0 && stu2 != 0) || (stu3 != 0 && stu2 != 0) || (stu1 != 0 && stu3 != 0))
-                    _upTrend[bar] = dLowerLevel;
+                    _upTrend[pbar] = dLowerLevel;
             }
 
             // Squeeze momentum relaxer show
             if (sq1 > 0 && sq1 < psq1 && psq1 > ppsq1 && bShowSqueeze)
-                _squeezie[bar] = candle.High + _tick * 4;
+                _squeezie[pbar] = candle.High + _tick * 4;
             if (sq1 < 0 && sq1 > psq1 && psq1 < ppsq1 && bShowSqueeze)
-                _squeezie[bar] = candle.Low - _tick * 4;
+                _squeezie[pbar] = candle.Low - _tick * 4;
 
             // 9/21 cross show
             if (nn > twone && prev_nn <= prev_twone && bShow921)
-                DrawText(bar, "X", Color.Yellow, Color.Transparent);
+                DrawText(pbar, "X", Color.Yellow, Color.Transparent);
             if (nn < twone && prev_nn >= prev_twone && bShow921)
-                DrawText(bar, "X", Color.Yellow, Color.Transparent);
+                DrawText(pbar, "X", Color.Yellow, Color.Transparent);
 
             if (eqHigh && bAdvanced && candle.Close > 0)
-                DrawText(bar - 1, "Equal\nHigh", Color.Lime, Color.Transparent, false, true);
+                DrawText(pbar, "Equal\nHigh", Color.Lime, Color.Transparent, false, true);
             if (eqLow && bAdvanced && candle.Close > 0)
-                DrawText(bar - 1, "Equal\nLow", Color.Yellow, Color.Transparent, false, true);
+                DrawText(pbar, "Equal\nLow", Color.Yellow, Color.Transparent, false, true);
 
             if (c0G && c1R && c2R && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta < 0 && bAdvanced && candle.Close > 0)
-                DrawText(bar, "Vol\nRev", Color.Yellow, Color.Transparent, false, true);
+                DrawText(pbar, "Vol\nRev", Color.Yellow, Color.Transparent, false, true);
             if (c0R && c1G && c2G && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta > 0 && bAdvanced && candle.Close > 0)
-                DrawText(bar, "Vol\nRev", Color.Lime, Color.Transparent, false, true);
+                DrawText(pbar, "Vol\nRev", Color.Lime, Color.Transparent, false, true);
 
-            // ========================================================================
             // ========================    UP CONDITIONS    ===========================
-            // ========================================================================
 
             if ((candle.Delta < iMinDelta) || (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama9 && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || (x < iMinADX))
                 bShowUp = false;
 
             if (green && bShowUp)
-                _posSeries[bar] = candle.Low - (_tick * 2);
+                _posSeries[pbar] = candle.Low - (_tick * 2);
 
-            // ========================================================================
             // ========================    DOWN CONDITIONS    =========================
-            // ========================================================================
 
             if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) || (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (x < iMinADX))
                 bShowDown = false;
 
             if (red && bShowDown)
-                _negSeries[bar] = candle.High + _tick * 2;
+                _negSeries[pbar] = candle.High + _tick * 2;
 
             if (_lastBar != bar)
             {
@@ -708,46 +720,44 @@
 
             var waddah = Math.Min(Math.Abs(t1) + 70, 255);
             if (canColor == 2) // (bWaddahCandles)
-                _paintBars[bar] = t1 > 0 ? MColor.FromArgb(255, 0, (byte)waddah, 0) : MColor.FromArgb(255, (byte)waddah, 0, 0);
+                _paintBars[pbar] = t1 > 0 ? MColor.FromArgb(255, 0, (byte)waddah, 0) : MColor.FromArgb(255, (byte)waddah, 0, 0);
 
             var filteredSQ = Math.Min(Math.Abs(sq1 * 25), 255);
             if (canColor == 3) // (bSqueezeCandles)
-                _paintBars[bar] = sq1 > 0 ? MColor.FromArgb(255, 0, (byte)filteredSQ, 0) : MColor.FromArgb(255, (byte)filteredSQ, 0, 0);
+                _paintBars[pbar] = sq1 > 0 ? MColor.FromArgb(255, 0, (byte)filteredSQ, 0) : MColor.FromArgb(255, (byte)filteredSQ, 0, 0);
 
             var filteredDelta = Math.Min(Math.Abs(candle.Delta), 255);
             if (canColor == 4) // (bDeltaCandles)
-                _paintBars[bar] = candle.Delta > 0 ? MColor.FromArgb(255, 0, (byte)filteredDelta, 0) : MColor.FromArgb(255, (byte)filteredDelta, 0, 0);
+                _paintBars[pbar] = candle.Delta > 0 ? MColor.FromArgb(255, 0, (byte)filteredDelta, 0) : MColor.FromArgb(255, (byte)filteredDelta, 0, 0);
 
-            // ========================================================================
             // =======================    REVERSAL PATTERNS    ========================
-            // ========================================================================
 
             // Bollinger band bounce
             if (bbShowBBBounce)
             {
                 if (candle.High > bb_top && candle.Open < bb_top && c0R && candle.Close < p1C.Close && upWick50PerLarger)
-                    DrawText(bar, "Wick", Color.Lime, Color.Transparent, false, true);
+                    DrawText(pbar, "Wick", Color.Lime, Color.Transparent, false, true);
                 if (candle.Low < bb_bottom && candle.Open > bb_bottom && c0G && candle.Close > p1C.Close && downWick50PerLarger)
-                    DrawText(bar, "Wick", Color.Orange, Color.Transparent, false, true);
+                    DrawText(pbar, "Wick", Color.Orange, Color.Transparent, false, true);
             }
 
             // _paintBars[bar] = Colors.Yellow;
             if (ThreeOutUp && bShowRevPattern)
-                DrawText(bar, "3oU", Color.Yellow, Color.Transparent);
+                DrawText(pbar, "3oU", Color.Yellow, Color.Transparent);
             if (ThreeOutDown && bShowRevPattern)
-                DrawText(bar, "3oD", Color.Yellow, Color.Transparent);
+                DrawText(pbar, "3oD", Color.Yellow, Color.Transparent);
 
             // Nebula cloud
             if (bShowCloud)
-                if (_kama9[bar] > _kama21[bar])
+                if (_kama9[pbar] > _kama21[pbar])
                 {
-                    _upCloud[bar].Upper = _kama9[bar];
-                    _upCloud[bar].Lower = _kama21[bar];
+                    _upCloud[pbar].Upper = _kama9[pbar];
+                    _upCloud[pbar].Lower = _kama21[pbar];
                 }
                 else
                 {
-                    _dnCloud[bar].Upper = _kama21[bar];
-                    _dnCloud[bar].Lower = _kama9[bar];
+                    _dnCloud[pbar].Upper = _kama21[pbar];
+                    _dnCloud[pbar].Lower = _kama9[pbar];
                 }
 
             // Trampoline
@@ -755,34 +765,41 @@
             {
                 if (c0R && c1R && candle.Close < p1C.Close && (rsi >= 70 || rsi1 >= 70 || rsi2 >= 70) &&
                     c2G && p2C.High >= (bb_top - (_tick * 30)))
-                    DrawText(bar, "TR", Color.Yellow, Color.BlueViolet);
+                    DrawText(pbar, "TR", Color.Yellow, Color.BlueViolet);
                 if (c0G && c1G && candle.Close > p1C.Close && (rsi < 25 || rsi1 < 25 || rsi2 < 25) &&
                     c2R && p2C.Low <= (bb_bottom + (_tick * 30)))
-                    DrawText(bar - 2, "TR", Color.Yellow, Color.BlueViolet);
+                    DrawText(pbar, "TR", Color.Yellow, Color.BlueViolet);
             }
 
             // Intensity signal
             var candleSeconds = Convert.ToDecimal((candle.LastTime - candle.Time).TotalSeconds);
             if (candleSeconds is 0) candleSeconds = 1;
             var volPerSecond = candle.Volume / candleSeconds;
-            var deltaPer1 = candle.Delta > 0 ? (candle.Delta / candle.MaxDelta) : (candle.Delta / candle.MinDelta);
+            decimal deltaPer1 = 0;
+            if (candle.Delta > 0 && candle.MaxDelta > 0)
+            {
+                if (candle.MinDelta > 0)
+                    deltaPer1 = (candle.Delta / candle.MaxDelta) * 100;
+                else
+                    deltaPer1 = (candle.Delta / candle.MinDelta) * 100;
+            }
             var deltaIntense = Math.Abs((candle.Delta * deltaPer1) * (candle.Volume / candleSeconds));
             if (deltaIntense > iBigTrades && candle.Delta > 350 && bShowIntense) 
-                DrawText(bar, "IT", Color.Yellow, Color.Green);
+                DrawText(pbar, "IT", Color.Yellow, Color.Green);
             else if (deltaIntense > iBigTrades && candle.Delta < 350 && bShowIntense)
-                DrawText(bar, "IT", Color.Yellow, Color.Red);
+                DrawText(pbar, "IT", Color.Yellow, Color.Red);
 
             if (bShowAMDKama && false)
             {
-                _kamanine.Colors[bar] = AMD(bar);
+                _kamanine.Colors[pbar] = AMD(pbar);
                 _kamanine.Width = 2;
-                _kamanine[bar] = kama9;
+                _kamanine[pbar] = kama9;
             }
 
             if (! bNewsProcessed && bShowNews)
-                LoadStock(bar);
+                LoadStock(pbar);
 
-
+            #endregion
 
         }
 
