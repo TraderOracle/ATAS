@@ -24,7 +24,7 @@
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.35";
+        private const String sVersion = "1.37";
 
         #region PRIVATE FIELDS
 
@@ -52,8 +52,7 @@
         private bool bVolumeImbalances = true;
 
         // Default FALSE
-        private bool bShowIntense = false;       // SHOW
-        private bool bShowAMDKama = false;
+        private bool bShowAMDKama = false;       // SHOW
         private bool bShowPNL = false;
         private bool bNewsProcessed = false;     // USE
         private bool bUseSqueeze = false;
@@ -338,8 +337,8 @@
         private ValueDataSeries _upTrend = new("Up SuperTrend") { Color = DefaultColors.Blue.Convert(), Width = 2, VisualType = VisualMode.Square, ShowZeroValue = false };
         private readonly ValueDataSeries _squeezie = new("Squeeze Relaxer") { Color = MColors.Yellow, VisualType = VisualMode.Dots, Width = 3 };
         private readonly ValueDataSeries _nine21 = new("9 21 cross") { Color = MColor.FromArgb(255, 0, 255, 0), VisualType = VisualMode.Block, Width = 4 };
-        private readonly ValueDataSeries _posSeries = new("Regular Buy Signal") { Color = MColor.FromArgb(255, 0, 255, 0), VisualType = VisualMode.Dots, Width = 3 };
-        private readonly ValueDataSeries _negSeries = new("Regular Sell Signal") { Color = MColor.FromArgb(255, 255, 0, 0), VisualType = VisualMode.Dots, Width = 3 };
+        private readonly ValueDataSeries _posSeries = new("Regular Buy Signal") { Color = MColor.FromArgb(255, 0, 255, 0), VisualType = VisualMode.UpArrow, Width = 2 };
+        private readonly ValueDataSeries _negSeries = new("Regular Sell Signal") { Color = MColor.FromArgb(255, 255, 0, 0), VisualType = VisualMode.DownArrow, Width = 2 };
         private readonly ValueDataSeries _posWhite = new("Vol Imbalance Sell") { Color = MColors.White, VisualType = VisualMode.DownArrow, Width = 1 };
         private readonly ValueDataSeries _negWhite = new("Vol Imbalance Buy") { Color = MColors.White, VisualType = VisualMode.UpArrow, Width = 1 };
 
@@ -368,6 +367,8 @@
 
         [Display(GroupName = "Colored Candles", Name = "Show Reversal Patterns")]
         public bool ShowRevPattern { get => bShowRevPattern; set { bShowRevPattern = value; RecalculateValues(); } }
+        [Display(GroupName = "Colored Candles", Name = "Show Advanced Ideas")]
+        public bool ShowBrooks { get => bAdvanced; set { bAdvanced = value; RecalculateValues(); } }
         [Display(GroupName = "Colored Candles", Name = "Waddah Sensitivity")]
         [Range(0, 9000)]
         public int WaddaSensitivity
@@ -380,8 +381,6 @@
         [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "AlertFile")]
         public string AlertFile { get; set; } = "alert1";
 
-        [Display(GroupName = "Extras", Name = "Show Advanced Ideas")]
-        public bool ShowBrooks { get => bAdvanced; set { bAdvanced = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "Show Triple Supertrend")]
         public bool ShowTripleSupertrend { get => bShowTripleSupertrend; set { bShowTripleSupertrend = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "Show 9/21 EMA Cross")]
@@ -399,12 +398,6 @@
         public bool Use_2kTick { get => bWaitTilClose; set { bWaitTilClose = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "Show Bollinger Wick", Description = "Show when price wicks the bollinger bands")]
         public bool Show_BB_Wick { get => bbShowBBBounce; set { bbShowBBBounce = value; RecalculateValues(); } }
-        [Display(GroupName = "Extras", Name = "Show intensity alerts (IT)")]
-        public bool Use_Intense { get => bShowIntense; set { bShowIntense = value; RecalculateValues(); } }
-        [Display(GroupName = "Extras", Name = "Intensity alert threshold")]
-        [Range(0, 90000)]
-        public int BigTrades
-        { get => iBigTrades; set { iBigTrades = value; RecalculateValues(); } }
 
         [Display(GroupName = "High Impact News", Name = "Show today's news")]
         public bool Show_News { get => bShowNews; set { bShowNews = value; RecalculateValues(); } }
@@ -480,7 +473,7 @@
 
         protected override void OnCalculate(int bar, decimal value)
         {
-            var candle = GetCandle(bar-1);
+            var candle = GetCandle(bar - 1);
             var pbar = bar - 1;
             value = candle.Close;
             var chT = ChartInfo.ChartType;
@@ -503,13 +496,13 @@
             decimal _tick = ChartInfo.PriceChartContainer.Step;
             var red = candle.Close < candle.Open;
             var green = candle.Close > candle.Open;
-            var p1C = GetCandle(bar - 2);
+            var p1C = GetCandle(pbar - 1);
             var c1G = p1C.Open < p1C.Close;
             var c1R = p1C.Open > p1C.Close;
 
-            var p2C = GetCandle(bar - 3);
-            var p3C = GetCandle(bar - 4);
-            var p4C = GetCandle(bar - 5);
+            var p2C = GetCandle(pbar - 2);
+            var p3C = GetCandle(pbar - 3);
+            var p4C = GetCandle(pbar - 4);
 
             var c0G = candle.Open < candle.Close;
             var c0R = candle.Open > candle.Close;
@@ -526,8 +519,8 @@
             var c3Body = Math.Abs(p3C.Close - p3C.Open);
             var c4Body = Math.Abs(p4C.Close - p4C.Open);
 
-            var upWick50PerLarger = c0R && Math.Abs(candle.High - candle.Open) > Math.Abs(candle.Low - candle.Close);
-            var downWick50PerLarger = c0G && Math.Abs(candle.Low - candle.Open) > Math.Abs(candle.Close - candle.High);
+            var upWickLarger = c0R && Math.Abs(candle.High - candle.Open) > Math.Abs(candle.Low - candle.Close);
+            var downWickLarger = c0G && Math.Abs(candle.Low - candle.Open) > Math.Abs(candle.Close - candle.High);
 
             var ThreeOutUp = c2R && c1G && c0G && p1C.Open < p2C.Close && p2C.Open < p1C.Close && Math.Abs(p1C.Open - p1C.Close) > Math.Abs(p2C.Open - p2C.Close) && candle.Close > p1C.Low;
 
@@ -619,22 +612,17 @@
                 }
             }
 
-            var eqHigh = c0R && c1R && c2G && c3G &&
+            var eqHigh = c0R && c1R && c2G && c3G && (p1C.High > bb_top || p2C.High > bb_top) &&
                 candle.Close < p1C.Close &&
-                (p1C.Close == p2C.Open || p1C.Close == p2C.Open + _tick || p1C.Close + _tick == p2C.Open);
+                (p1C.Open == p2C.Close || p1C.Open == p2C.Close + _tick || p1C.Open + _tick == p2C.Close);
 
-            var eqLow = c0G && c1G && c2R && c3R &&
+            var eqLow = c0G && c1G && c2R && c3R && (p1C.Low < bb_bottom || p2C.Low < bb_bottom) &&
                 candle.Close > p1C.Close &&
-                (p1C.Close == p2C.Open || p1C.Close == p2C.Open + _tick || p1C.Close + _tick == p2C.Open);
+                (p1C.Open == p2C.Close || p1C.Open == p2C.Close + _tick || p1C.Open + _tick == p2C.Close);
 
             var t1 = ((fast - slow) - (fastM - slowM)) * iWaddaSensitivity;
 
             // ====================    SHOW/OTHER CONDITIONS    =======================
-
-            if (c4Body > c3Body && c3Body > c2Body && c2Body > c1Body && c1Body > c0Body && bAdvanced)
-                if ((candle.Close > p1C.Close && p1C.Close > p2C.Close && p2C.Close > p3C.Close) ||
-                (candle.Close < p1C.Close && p1C.Close < p2C.Close && p2C.Close < p3C.Close))
-                    DrawText(pbar, "Stairs", Color.Yellow, Color.Transparent);
 
             if (deltaPer < iMinDeltaPercent)
             {
@@ -663,19 +651,22 @@
 
             // 9/21 cross show
             if (nn > twone && prev_nn <= prev_twone && bShow921)
-                DrawText(pbar, "X", Color.Yellow, Color.Transparent);
+                DrawText(pbar, "X", Color.Yellow, Color.Transparent, false, true);
             if (nn < twone && prev_nn >= prev_twone && bShow921)
-                DrawText(pbar, "X", Color.Yellow, Color.Transparent);
+                DrawText(pbar, "X", Color.Yellow, Color.Transparent, false, true);
 
-            if (eqHigh && bAdvanced && candle.Close > 0)
-                DrawText(pbar, "Equal\nHigh", Color.Lime, Color.Transparent, false, true);
-            if (eqLow && bAdvanced && candle.Close > 0)
-                DrawText(pbar, "Equal\nLow", Color.Yellow, Color.Transparent, false, true);
+            if (bAdvanced)
+            {
+                if (c4Body > c3Body && c3Body > c2Body && c2Body > c1Body && c1Body > c0Body)
+                    if ((candle.Close > p1C.Close && p1C.Close > p2C.Close && p2C.Close > p3C.Close) ||
+                    (candle.Close < p1C.Close && p1C.Close < p2C.Close && p2C.Close < p3C.Close))
+                        DrawText(pbar, "Stairs", Color.Yellow, Color.Transparent);
 
-            if (c0G && c1R && c2R && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta < 0 && bAdvanced && candle.Close > 0)
-                DrawText(pbar, "Vol\nRev", Color.Yellow, Color.Transparent, false, true);
-            if (c0R && c1G && c2G && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta > 0 && bAdvanced && candle.Close > 0)
-                DrawText(pbar, "Vol\nRev", Color.Lime, Color.Transparent, false, true);
+                if (eqHigh)
+                    DrawText(pbar - 1, "Equal\nHigh", Color.Lime, Color.Transparent, false, true);
+                if (eqLow)
+                    DrawText(pbar - 1, "Equal\nLow", Color.Yellow, Color.Transparent, false, true);
+            }
 
             // ========================    UP CONDITIONS    ===========================
 
@@ -728,20 +719,27 @@
 
             // =======================    REVERSAL PATTERNS    ========================
 
-            // Bollinger band bounce
             if (bbShowBBBounce)
             {
-                if (candle.High > bb_top && candle.Open < bb_top && c0R && candle.Close < p1C.Close && upWick50PerLarger)
-                    DrawText(pbar, "Wick", Color.Lime, Color.Transparent, false, true);
-                if (candle.Low < bb_bottom && candle.Open > bb_bottom && c0G && candle.Close > p1C.Close && downWick50PerLarger)
-                    DrawText(pbar, "Wick", Color.Orange, Color.Transparent, false, true);
+                if (c0R && candle.High > bb_top && candle.Open < bb_top && candle.Open > p1C.Close && upWickLarger)
+                    DrawText(pbar, "Wick", Color.Yellow, Color.Transparent);
+                if (c0G && candle.Low < bb_bottom && candle.Open > bb_bottom && candle.Open > p1C.Close && downWickLarger)
+                    DrawText(pbar, "Wick", Color.Yellow, Color.Transparent);
             }
 
-            // _paintBars[bar] = Colors.Yellow;
-            if (ThreeOutUp && bShowRevPattern)
-                DrawText(pbar, "3oU", Color.Yellow, Color.Transparent);
-            if (ThreeOutDown && bShowRevPattern)
-                DrawText(pbar, "3oD", Color.Yellow, Color.Transparent);
+            if (bShowRevPattern)
+            {
+                if (c0G && c1R && c2R && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta < 0)
+                    DrawText(pbar, "Vol\nRev", Color.Yellow, Color.Transparent, false, true);
+                if (c0R && c1G && c2G && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta > 0)
+                    DrawText(pbar, "Vol\nRev", Color.Lime, Color.Transparent, false, true);
+
+                // _paintBars[bar] = Colors.Yellow;
+                if (ThreeOutUp)
+                    DrawText(pbar, "3oU", Color.Yellow, Color.Transparent);
+                if (ThreeOutDown && bShowRevPattern)
+                    DrawText(pbar, "3oD", Color.Yellow, Color.Transparent);
+            }
 
             // Nebula cloud
             if (bShowCloud)
@@ -767,24 +765,6 @@
                     DrawText(pbar, "TR", Color.Yellow, Color.BlueViolet);
             }
 
-            // Intensity signal
-            var candleSeconds = Convert.ToDecimal((candle.LastTime - candle.Time).TotalSeconds);
-            if (candleSeconds is 0) candleSeconds = 1;
-            var volPerSecond = candle.Volume / candleSeconds;
-            decimal deltaPer1 = 0;
-            if (candle.Delta > 0 && candle.MaxDelta > 0)
-            {
-                if (candle.MinDelta > 0)
-                    deltaPer1 = (candle.Delta / candle.MaxDelta) * 100;
-                else
-                    deltaPer1 = (candle.Delta / candle.MinDelta) * 100;
-            }
-            var deltaIntense = Math.Abs((candle.Delta * deltaPer1) * (candle.Volume / candleSeconds));
-            if (deltaIntense > iBigTrades && candle.Delta > 350 && bShowIntense) 
-                DrawText(pbar, "IT", Color.Yellow, Color.Green);
-            else if (deltaIntense > iBigTrades && candle.Delta < 350 && bShowIntense)
-                DrawText(pbar, "IT", Color.Yellow, Color.Red);
-
             if (bShowAMDKama && false)
             {
                 _kamanine.Colors[pbar] = AMD(pbar);
@@ -792,7 +772,7 @@
                 _kamanine[pbar] = kama9;
             }
 
-            if (! bNewsProcessed && bShowNews)
+            if (!bNewsProcessed && bShowNews)
                 LoadStock(pbar);
 
         }
