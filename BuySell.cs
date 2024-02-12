@@ -20,16 +20,19 @@
     using MColors = System.Windows.Media.Colors;
     using Pen = System.Drawing.Pen;
     using String = String;
+    using System.Runtime.ConstrainedExecution;
 
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.37";
+        private const String sVersion = "1.38";
+        private int iJunk = 0;
 
         #region PRIVATE FIELDS
 
         private List<string> lsH = new List<string>();
         private List<string> lsM = new List<string>();
+        private List<int> lsCandle = new List<int>();
 
         public decimal Decimal { get; set; }
         private readonly PaintbarsDataSeries _paintBars = new("Paint bars");
@@ -118,71 +121,76 @@
 
         #endregion
 
-        #region Stock HTTP Fetch
+        #region INDICATORS
 
-        private void ParseStockEvents(String result, int bar)
-        {
-            int iJSONStart = 0;
-            int iJSONEnd = -1;
-            String sFinalText = String.Empty; String sNews = String.Empty; String name = String.Empty; String impact = String.Empty; String time = String.Empty; String actual = String.Empty; String previous = String.Empty; String forecast = String.Empty; 
-
-            try
-            { 
-                iJSONStart = result.IndexOf("window.calendarComponentStates[1] = ");
-                iJSONEnd = result.IndexOf("\"}]}],", iJSONStart); 
-                sFinalText = result.Substring(iJSONStart, iJSONEnd - iJSONStart);
-                sFinalText = sFinalText.Replace("window.calendarComponentStates[1] = ", "");
-                sFinalText += "\"}]}]}";
-                 
-                var jsFile = JObject.Parse(sFinalText);
-                foreach (JToken j3 in (JArray)jsFile["days"])
-                {
-                    JToken j2 = j3.SelectToken("events");
-                    foreach (JToken j in j2)
-                    {
-                        name = j["name"].ToString();
-                        impact = j["impactTitle"].ToString();
-                        time = j["timeLabel"].ToString();
-                        actual = j["actual"].ToString();
-                        previous = j["previous"].ToString();
-                        forecast = j["forecast"].ToString();
-                        sNews = time + "     " + name;
-                        if (previous.ToString().Trim().Length > 0)
-                            sNews += " (Prev: " + previous + ", Forecast: " + forecast + ")";
-                        if (impact.Contains("High"))
-                            lsH.Add(sNews);
-                        if (impact.Contains("Medium"))
-                            lsM.Add(sNews);
-                    }
-                }
-            }
-            catch { }
-        }
-
-        private void LoadStock(int bar)
-        {
-            try
-            {
-                HttpWebRequest myRequest = (HttpWebRequest)WebRequest.Create("https://www.forexfactory.com/calendar?day=today");
-                myRequest.Method = "GET";
-                myRequest.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36";
-                WebResponse myResponse = myRequest.GetResponse();
-                StreamReader sr = new StreamReader(myResponse.GetResponseStream(), System.Text.Encoding.UTF8);
-                string result = sr.ReadToEnd();
-                sr.Close();
-                myResponse.Close();
-                ParseStockEvents(result, bar);
-                bNewsProcessed = true;
-            }
-            catch { }
-        }
+        private readonly RSI _rsi = new() { Period = 14 };
+        private readonly ATR _atr = new() { Period = 14 };
+        private readonly AwesomeOscillator _ao = new AwesomeOscillator();
+        private readonly ParabolicSAR _psar = new ParabolicSAR();
+        private readonly ADX _adx = new ADX() { Period = 10 };
+        private readonly EMA _myEMA = new EMA() { Period = 21 };
+        private readonly EMA _9 = new EMA() { Period = 9 };
+        private readonly EMA _21 = new EMA() { Period = 21 };
+        private readonly EMA fastEma = new EMA() { Period = 20 };
+        private readonly EMA slowEma = new EMA() { Period = 40 };
+        private readonly FisherTransform _ft = new FisherTransform() { Period = 10 };
+        private readonly SuperTrend _st1 = new SuperTrend() { Period = 10, Multiplier = 1m };
+        private readonly SuperTrend _st2 = new SuperTrend() { Period = 11, Multiplier = 2m };
+        private readonly SuperTrend _st3 = new SuperTrend() { Period = 12, Multiplier = 3m };
+        private readonly BollingerBands _bb = new BollingerBands() { Period = 20, Shift = 0, Width = 2 };
+        private readonly KAMA _kama9 = new KAMA() { ShortPeriod = 2, LongPeriod = 109, EfficiencyRatioPeriod = 9 };
+        private readonly KAMA _kama21 = new KAMA() { ShortPeriod = 2, LongPeriod = 109, EfficiencyRatioPeriod = 21 };
+        private readonly MACD _macd = new MACD() { ShortPeriod = 12, LongPeriod = 26, SignalPeriod = 9 };
+        private readonly T3 _t3 = new T3() { Period = 10, Multiplier = 1 };
+        private readonly SqueezeMomentum _sq = new SqueezeMomentum() { BBPeriod = 20, BBMultFactor = 2, KCPeriod = 20, KCMultFactor = 1.5m, UseTrueRange = false };
 
         #endregion
+
+
+        private void HandleCandle()
+        {
+            var bar = CurrentBar;
+            var pbar = bar - 1;
+            var candle = GetCandle(pbar);
+            var p1C = GetCandle(bar - 2);
+            var p2C = GetCandle(bar - 3);
+            var p3C = GetCandle(bar - 3);
+
+            decimal _tick = ChartInfo.PriceChartContainer.Step;
+            var red = candle.Close < candle.Open;
+            var green = candle.Close > candle.Open;
+            var c1R = p1C.Close < p1C.Open;
+            var c1G = p1C.Close > p1C.Open;
+            var c2R = p2C.Close < p2C.Open;
+            var c2G = p2C.Close > p2C.Open;
+            var c3R = p3C.Close < p3C.Open;
+            var c4G = p3C.Close > p3C.Open;
+
+            if (bVolumeImbalances)
+            {
+                var highPen = new Pen(new SolidBrush(Color.White)) { Width = 2 };
+                if (c1G && c2G && p1C.Open > p2C.Close)
+                {
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar-1, p1C.Open, highPen));
+                    _negWhite[pbar-1] = p1C.Low - (_tick * 2);
+                }
+                if (c1R && c2R && p1C.Open < p2C.Close)
+                {
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar-1, p1C.Open, highPen));
+                    _posWhite[pbar-1] = p1C.High + (_tick * 2);
+                }
+            }
+
+            lsCandle.Add(CurrentBar);
+        }
 
         #region RENDER CONTEXT
 
         protected override void OnRender(RenderContext context, DrawingLayouts layout)
         {
+//            if (!lsCandle.Contains(CurrentBar))
+//                HandleCandle();
+
             var font2 = new RenderFont("Arial", iNewsFont);
             var fontB = new RenderFont("Arial", iNewsFont, FontStyle.Bold);
             int upY = 50;
@@ -292,31 +300,6 @@
 
             AddText("Aver" + bBar, strX, true, bBar, loc, cI, cB, iFontSize, DrawingText.TextAlign.Center);
         }
-
-        #endregion
-
-        #region INDICATORS
-
-        private readonly RSI _rsi = new() { Period = 14 };
-        private readonly ATR _atr = new() { Period = 14 };
-        private readonly AwesomeOscillator _ao = new AwesomeOscillator();
-        private readonly ParabolicSAR _psar = new ParabolicSAR();
-        private readonly ADX _adx = new ADX() { Period = 10 };
-        private readonly EMA _myEMA = new EMA() { Period = 21 };
-        private readonly EMA _9 = new EMA() { Period = 9 };
-        private readonly EMA _21 = new EMA() { Period = 21 };
-        private readonly EMA fastEma = new EMA() { Period = 20 };
-        private readonly EMA slowEma = new EMA() { Period = 40 };
-        private readonly FisherTransform _ft = new FisherTransform() { Period = 10 };
-        private readonly SuperTrend _st1 = new SuperTrend() { Period = 10, Multiplier = 1m };
-        private readonly SuperTrend _st2 = new SuperTrend() { Period = 11, Multiplier = 2m };
-        private readonly SuperTrend _st3 = new SuperTrend() { Period = 12, Multiplier = 3m };
-        private readonly BollingerBands _bb = new BollingerBands() { Period = 20, Shift = 0, Width = 2 };
-        private readonly KAMA _kama9 = new KAMA() { ShortPeriod = 2, LongPeriod = 109, EfficiencyRatioPeriod = 9 };
-        private readonly KAMA _kama21 = new KAMA() { ShortPeriod = 2, LongPeriod = 109, EfficiencyRatioPeriod = 21 };
-        private readonly MACD _macd = new MACD() { ShortPeriod = 12, LongPeriod = 26, SignalPeriod = 9 };
-        private readonly T3 _t3 = new T3() { Period = 10, Multiplier = 1 };
-        private readonly SqueezeMomentum _sq = new SqueezeMomentum() { BBPeriod = 20, BBMultFactor = 2, KCPeriod = 20, KCMultFactor = 1.5m, UseTrueRange = false };
 
         #endregion
 
@@ -471,13 +454,69 @@
 
         #endregion
 
+        #region Stock HTTP Fetch
+
+        private void ParseStockEvents(String result, int bar)
+        {
+            int iJSONStart = 0;
+            int iJSONEnd = -1;
+            String sFinalText = String.Empty; String sNews = String.Empty; String name = String.Empty; String impact = String.Empty; String time = String.Empty; String actual = String.Empty; String previous = String.Empty; String forecast = String.Empty;
+
+            try
+            {
+                iJSONStart = result.IndexOf("window.calendarComponentStates[1] = ");
+                iJSONEnd = result.IndexOf("\"}]}],", iJSONStart);
+                sFinalText = result.Substring(iJSONStart, iJSONEnd - iJSONStart);
+                sFinalText = sFinalText.Replace("window.calendarComponentStates[1] = ", "");
+                sFinalText += "\"}]}]}";
+
+                var jsFile = JObject.Parse(sFinalText);
+                foreach (JToken j3 in (JArray)jsFile["days"])
+                {
+                    JToken j2 = j3.SelectToken("events");
+                    foreach (JToken j in j2)
+                    {
+                        name = j["name"].ToString();
+                        impact = j["impactTitle"].ToString();
+                        time = j["timeLabel"].ToString();
+                        actual = j["actual"].ToString();
+                        previous = j["previous"].ToString();
+                        forecast = j["forecast"].ToString();
+                        sNews = time + "     " + name;
+                        if (previous.ToString().Trim().Length > 0)
+                            sNews += " (Prev: " + previous + ", Forecast: " + forecast + ")";
+                        if (impact.Contains("High"))
+                            lsH.Add(sNews);
+                        if (impact.Contains("Medium"))
+                            lsM.Add(sNews);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void LoadStock(int bar)
+        {
+            try
+            {
+                HttpWebRequest myRequest = (HttpWebRequest)WebRequest.Create("https://www.forexfactory.com/calendar?day=today");
+                myRequest.Method = "GET";
+                myRequest.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36";
+                WebResponse myResponse = myRequest.GetResponse();
+                StreamReader sr = new StreamReader(myResponse.GetResponseStream(), System.Text.Encoding.UTF8);
+                string result = sr.ReadToEnd();
+                sr.Close();
+                myResponse.Close();
+                ParseStockEvents(result, bar);
+                bNewsProcessed = true;
+            }
+            catch { }
+        }
+
+        #endregion
+
         protected override void OnCalculate(int bar, decimal value)
         {
-            var candle = GetCandle(bar - 1);
-            var pbar = bar - 1;
-            value = candle.Close;
-            var chT = ChartInfo.ChartType;
-
             if (bar == 0)
             {
                 DataSeries.ForEach(x => x.Clear());
@@ -489,6 +528,11 @@
                 return;
 
             #region CANDLE CALCULATIONS
+
+            var candle = GetCandle(bar - 1);
+            var pbar = bar - 1;
+            value = candle.Close;
+            var chT = ChartInfo.ChartType;
 
             bShowDown = true;
             bShowUp = true;
@@ -533,6 +577,21 @@
                     deltaPer = (candle.Delta / candle.MaxDelta) * 100;
                 else
                     deltaPer = (candle.Delta / candle.MinDelta) * 100;
+            }
+
+            if (bVolumeImbalances)
+            {
+                var highPen = new Pen(new SolidBrush(Color.RebeccaPurple)) { Width = 2 };
+                if (green && c1G && candle.Open > p1C.Close)
+                {
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
+                    _negWhite[pbar] = candle.Low - (_tick * 2);
+                }
+                if (red && c1R && candle.Open < p1C.Close)
+                {
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
+                    _posWhite[pbar] = candle.High + (_tick * 2);
+                }
             }
 
             #endregion
@@ -596,21 +655,6 @@
             var psarSell = (psar > candle.Close);
 
             #endregion
-
-            if (bVolumeImbalances)
-            {
-                var highPen = new Pen(new SolidBrush(Color.RebeccaPurple)) { Width = 2 };
-                if (green && c1G && candle.Open > p1C.Close)
-                {
-                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
-                    _negWhite[pbar] = candle.Low - (_tick * 2);
-                }
-                if (red && c1R && candle.Open < p1C.Close)
-                {
-                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
-                    _posWhite[pbar] = candle.High + (_tick * 2);
-                }
-            }
 
             var eqHigh = c0R && c1R && c2G && c3G && (p1C.High > bb_top || p2C.High > bb_top) &&
                 candle.Close < p1C.Close &&
