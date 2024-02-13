@@ -64,7 +64,6 @@
         private bool bUseWaddah = true;
         private bool bUseT3 = true;
         private bool bUseSuperTrend = true;
-        private bool bUseAO = true;
         private bool bUsePSAR = true;
         private bool bVolumeImbalances = true;
 
@@ -75,6 +74,7 @@
         private bool bUseMACD = false;
         private bool bUseKAMA = false;
         private bool bUseMyEMA = false;
+        private bool bUseAO = false;
 
         private bool bShow921 = false;
         private bool bShowSqueeze = false;
