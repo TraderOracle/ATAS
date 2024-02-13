@@ -28,7 +28,7 @@
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.39";
+        private const String sVersion = "1.40";
         private int iJunk = 0;
 
         #region PRIVATE FIELDS
@@ -54,6 +54,7 @@
 
         private int _lastBar = -1;
         private bool _lastBarCounted;
+        private Color lastColor = Color.White;
 
         // Default TRUE
         private bool bShowTramp = true;          // SHOW
@@ -166,21 +167,41 @@
             if (ChartInfo is null || InstrumentInfo is null)
                 return;
 
+            FontSetting Font = new("Arial", iFontSize);
+            var renderString = "Howdy";
+            var stringSize = context.MeasureString(renderString, Font.RenderObject);
+            int x4 = 0;
+            int y4 = 0;
+
             for (var bar = FirstVisibleBarNumber; bar <= LastVisibleBarNumber; bar++)
             {
-                FontSetting Font = new("Arial", iFontSize);
-                //Font.Bold = true;
-
-                var renderString = bar.ToString(CultureInfo.InvariantCulture);
-                var stringSize = context.MeasureString(renderString, Font.RenderObject);
+                renderString = bar.ToString(CultureInfo.InvariantCulture);
+                stringSize = context.MeasureString(renderString, Font.RenderObject);
 
                 foreach (bars ix in lsBar)
+                {
+                    Color bitches = AMD(bar);
+                    if (bitches != Color.White && lastColor != bitches)
+                    {
+                        Font.Bold = true;
+                        if (bitches == Color.FromArgb(252, 58, 58))
+                            renderString = "MANIPULATION";
+                        else
+                            renderString = "DISTRIBUTION";
+                        stringSize = context.MeasureString(renderString, Font.RenderObject);
+                        x4 = ChartInfo.GetXByBar(bar, false);
+                        y4 = Container.Region.Height - stringSize.Height - 10;
+                        context.DrawString(renderString, Font.RenderObject, bitches, x4, y4, _format);
+                        lastColor = bitches;
+                        Font.Bold = false;
+                    }
+
                     if (ix.bar == bar)
                     {
                         renderString = ix.s.ToString(CultureInfo.InvariantCulture);
                         stringSize = context.MeasureString(renderString, Font.RenderObject);
-                        var x4 = ChartInfo.GetXByBar(bar, false);
-                        var y4 = Offset;
+                        x4 = ChartInfo.GetXByBar(bar, false);
+                        y4 = Offset;
                         if (ix.top)
                         {
                             var high = GetCandle(bar).High;
@@ -195,6 +216,7 @@
                         }
                         break;
                     }
+                }
             }
 
             var font2 = new RenderFont("Arial", iNewsFont);
@@ -772,6 +794,35 @@
             if (!bNewsProcessed && bShowNews)
                 LoadStock(pbar);
 
+        }
+
+        private Color AMD(int bar)
+        {
+            var candle = GetCandle(bar);
+            var diff = InstrumentInfo.TimeZone;
+            var time = candle.Time.AddHours(diff);
+
+            // Manipulation
+            if (
+                (time.Hour == 8 && time.Minute >= 47 && time.Minute <= 59) ||
+                (time.Hour == 9 && time.Minute >= 00 && time.Minute <= 11) ||
+                (time.Hour == 10 && time.Minute >= 10 && time.Minute <= 26) ||
+                (time.Hour == 11 && time.Minute >= 07 && time.Minute <= 19) ||
+                (time.Hour == 11 && time.Minute >= 55 && time.Minute <= 59) ||
+                (time.Hour == 12 && time.Minute >= 00 && time.Minute <= 07)
+                )
+                return Color.FromArgb(252, 58, 58);
+
+            // Distribution
+            if (
+                (time.Hour == 9 && time.Minute >= 11 && time.Minute <= 47) ||
+                (time.Hour == 10 && time.Minute >= 26 && time.Minute <= 50) ||
+                (time.Hour == 11 && time.Minute >= 19 && time.Minute <= 37) ||
+                (time.Hour == 12 && time.Minute >= 07 && time.Minute <= 25)
+                )
+                return Color.FromArgb(78, 152, 242);
+
+            return Color.White;
         }
 
     }
