@@ -24,11 +24,12 @@
     using static ATAS.Indicators.Technical.BarTimer;
     using System.Globalization;
     using OFT.Rendering.Settings;
+    using System.Windows.Ink;
 
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.40";
+        private const String sVersion = "1.41";
         private int iJunk = 0;
 
         #region PRIVATE FIELDS
@@ -55,6 +56,7 @@
         private int _lastBar = -1;
         private bool _lastBarCounted;
         private Color lastColor = Color.White;
+        private String lastEvil = "";
 
         // Default TRUE
         private bool bShowTramp = true;          // SHOW
@@ -83,6 +85,8 @@
         private bool bShowTripleSupertrend = false;
         private bool bShowCloud = false;
         private bool bAdvanced = false;
+        private bool bShowStar = false;
+        private bool bShowEvil = true;
 
         private int iMinDelta = 0;
         private int iMinDeltaPercent = 0;
@@ -180,8 +184,20 @@
 
                 foreach (bars ix in lsBar)
                 {
-                    Color bitches = AMD(bar);
-                    if (bitches != Color.White && lastColor != bitches)
+                    String Evil = EvilTimes(bar);
+                    if (Evil != "" && lastEvil != Evil && bShowEvil)
+                    {
+                        Font.Bold = false;
+                        stringSize = context.MeasureString(Evil, Font.RenderObject);
+                        x4 = ChartInfo.GetXByBar(bar, false);
+                        y4 = Container.Region.Height - stringSize.Height - 40;
+                        context.DrawString(Evil, Font.RenderObject, Color.AliceBlue, x4, y4, _format);
+                        lastEvil = Evil;
+                        Font.Bold = false;
+                    }
+
+                    Color bitches = StarTimes(bar);
+                    if (bitches != Color.White && lastColor != bitches && bShowStar)
                     {
                         Font.Bold = true;
                         if (bitches == Color.FromArgb(252, 58, 58))
@@ -395,6 +411,11 @@
         public bool Use_Cloud { get => bShowCloud; set { bShowCloud = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "Show Trampoline", Description = "Trampoline is the ultimate reversal indicator")]
         public bool Use_Tramp { get => bShowTramp; set { bShowTramp = value; RecalculateValues(); } }
+
+        [Display(GroupName = "Extras", Name = "Show Evil Times", Description = "Market timing from FighterOfEvil, on Discord")]
+        public bool ShowEvil { get => bShowEvil; set { bShowEvil = value; RecalculateValues(); } }
+        [Display(GroupName = "Extras", Name = "Show Star Times", Description = "Market timing from Star, on Discord")]
+        public bool ShowStar { get => bShowStar; set { bShowStar = value; RecalculateValues(); } }
 
         [Display(GroupName = "High Impact News", Name = "Show today's news")]
         public bool Show_News { get => bShowNews; set { bShowNews = value; RecalculateValues(); } }
@@ -796,7 +817,40 @@
 
         }
 
-        private Color AMD(int bar)
+        private String EvilTimes(int bar)
+        {
+            var candle = GetCandle(bar);
+            var diff = InstrumentInfo.TimeZone;
+            var time = candle.Time.AddHours(diff);
+
+            if (time.Hour == 9 && time.Minute >= 00 && time.Minute <= 59)
+                return "Market Pivot";
+
+            if (time.Hour == 10 && time.Minute >= 00 && time.Minute <= 29)
+                return "Euro Move";
+
+            if (time.Hour == 10 && time.Minute >= 30 && time.Minute <= 59)
+                return "Inverse";
+
+            if (time.Hour == 11 && time.Minute >= 00 && time.Minute <= 59)
+                return "Inverse ";
+
+            if (time.Hour == 12 && time.Minute >= 00 && time.Minute <= 59)
+                return "Bond Auctions";
+
+            if (time.Hour == 13 && time.Minute >= 29 && time.Minute <= 59)
+                return "Capital Injection";
+
+            if (time.Hour == 14 && time.Minute >= 29 && time.Minute <= 59)
+                return "Capital Injection";
+
+            if (time.Hour == 14 && time.Minute >= 49 && time.Minute <= 59)
+                return "Rug Pull";
+
+            return "";
+        }
+
+        private Color StarTimes(int bar)
         {
             var candle = GetCandle(bar);
             var diff = InstrumentInfo.TimeZone;
