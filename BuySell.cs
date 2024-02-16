@@ -29,8 +29,9 @@
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.41";
+        private const String sVersion = "1.43";
         private int iJunk = 0;
+        private bool bBigArrowUp = false;
 
         #region PRIVATE FIELDS
 
@@ -66,13 +67,13 @@
         private bool bUseFisher = true;          // USE
         private bool bUseWaddah = true;
         private bool bUseT3 = true;
-        private bool bUseSuperTrend = true;
         private bool bUsePSAR = true;
         private bool bVolumeImbalances = true;
 
         // Default FALSE
         private bool bShowPNL = false;
         private bool bNewsProcessed = false;     // USE
+        private bool bUseSuperTrend = false;
         private bool bUseSqueeze = false;
         private bool bUseMACD = false;
         private bool bUseKAMA = false;
@@ -86,7 +87,7 @@
         private bool bShowCloud = false;
         private bool bAdvanced = false;
         private bool bShowStar = false;
-        private bool bShowEvil = true;
+        private bool bShowEvil = false;
 
         private int iMinDelta = 0;
         private int iMinDeltaPercent = 0;
@@ -98,6 +99,7 @@
         private int iBigTrades = 25000;
         private int iNewsFont = 10;
         private int iWaddaSensitivity = 120;
+        private int iMACDSensitivity = 70;
         private int CandleColoring = 0;
 
         #endregion
@@ -115,6 +117,8 @@
             DataSeries.Add(_negSeries);
             DataSeries.Add(_negWhite);
             DataSeries.Add(_posWhite);
+            DataSeries.Add(_negRev);
+            DataSeries.Add(_posRev);
             DataSeries.Add(_nine21);
             DataSeries.Add(_squeezie);
             DataSeries.Add(_paintBars);
@@ -158,7 +162,7 @@
         private readonly BollingerBands _bb = new BollingerBands() { Period = 20, Shift = 0, Width = 2 };
         private readonly KAMA _kama9 = new KAMA() { ShortPeriod = 2, LongPeriod = 109, EfficiencyRatioPeriod = 9 };
         private readonly KAMA _kama21 = new KAMA() { ShortPeriod = 2, LongPeriod = 109, EfficiencyRatioPeriod = 21 };
-        private readonly MACD _macd = new MACD() { ShortPeriod = 12, LongPeriod = 26, SignalPeriod = 9 };
+        private readonly MACD _macd = new MACD() { ShortPeriod = 3, LongPeriod = 10, SignalPeriod = 16 };
         private readonly T3 _t3 = new T3() { Period = 10, Multiplier = 1 };
         private readonly SqueezeMomentum _sq = new SqueezeMomentum() { BBPeriod = 20, BBMultFactor = 2, KCPeriod = 20, KCMultFactor = 1.5m, UseTrueRange = false };
 
@@ -169,6 +173,8 @@
         protected override void OnRender(RenderContext context, DrawingLayouts layout)
         {
             if (ChartInfo is null || InstrumentInfo is null)
+                return;
+            if (!bShowPNL && !bShowEvil && !bShowNews && !bShowStar && !bAdvanced && !bShowRevPattern)
                 return;
 
             FontSetting Font = new("Arial", iFontSize);
@@ -184,32 +190,38 @@
 
                 foreach (bars ix in lsBar)
                 {
-                    String Evil = EvilTimes(bar);
-                    if (Evil != "" && lastEvil != Evil && bShowEvil)
+                    if (bShowEvil)
                     {
-                        Font.Bold = false;
-                        stringSize = context.MeasureString(Evil, Font.RenderObject);
-                        x4 = ChartInfo.GetXByBar(bar, false);
-                        y4 = Container.Region.Height - stringSize.Height - 40;
-                        context.DrawString(Evil, Font.RenderObject, Color.AliceBlue, x4, y4, _format);
-                        lastEvil = Evil;
-                        Font.Bold = false;
+                        String Evil = EvilTimes(bar);
+                        if (Evil != "" && lastEvil != Evil && bShowEvil)
+                        {
+                            Font.Bold = false;
+                            stringSize = context.MeasureString(Evil, Font.RenderObject);
+                            x4 = ChartInfo.GetXByBar(bar, false);
+                            y4 = Container.Region.Height - stringSize.Height - 40;
+                            context.DrawString(Evil, Font.RenderObject, Color.AliceBlue, x4, y4, _format);
+                            lastEvil = Evil;
+                            Font.Bold = false;
+                        }
                     }
 
-                    Color bitches = StarTimes(bar);
-                    if (bitches != Color.White && lastColor != bitches && bShowStar)
+                    if (bShowEvil || bShowStar)
                     {
-                        Font.Bold = true;
-                        if (bitches == Color.FromArgb(252, 58, 58))
-                            renderString = "MANIPULATION";
-                        else
-                            renderString = "DISTRIBUTION";
-                        stringSize = context.MeasureString(renderString, Font.RenderObject);
-                        x4 = ChartInfo.GetXByBar(bar, false);
-                        y4 = Container.Region.Height - stringSize.Height - 10;
-                        context.DrawString(renderString, Font.RenderObject, bitches, x4, y4, _format);
-                        lastColor = bitches;
-                        Font.Bold = false;
+                        Color bitches = StarTimes(bar);
+                        if (bitches != Color.White && lastColor != bitches && bShowStar)
+                        {
+                            Font.Bold = true;
+                            if (bitches == Color.FromArgb(252, 58, 58))
+                                renderString = "MANIPULATION";
+                            else
+                                renderString = "DISTRIBUTION";
+                            stringSize = context.MeasureString(renderString, Font.RenderObject);
+                            x4 = ChartInfo.GetXByBar(bar, false);
+                            y4 = Container.Region.Height - stringSize.Height - 10;
+                            context.DrawString(renderString, Font.RenderObject, bitches, x4, y4, _format);
+                            lastColor = bitches;
+                            Font.Bold = false;
+                        }
                     }
 
                     if (ix.bar == bar)
@@ -233,67 +245,70 @@
                         break;
                     }
                 }
-            }
 
-            var font2 = new RenderFont("Arial", iNewsFont);
-            var fontB = new RenderFont("Arial", iNewsFont, FontStyle.Bold);
-            int upY = 50;
-            int upX = ChartArea.Width - 350;
-            int iTrades = 0;
 
-            if (TradingManager.Portfolio != null && bShowPNL)
-            {
-                var txt1 = $"Account: {TradingManager.Portfolio.AccountID}";
-                context.DrawString(txt1, font2, Color.Gray, upX, upY);
-                var tsize = context.MeasureString(txt1, font2);
+                var font2 = new RenderFont("Arial", iNewsFont);
+                var fontB = new RenderFont("Arial", iNewsFont, FontStyle.Bold);
+                int upY = 50;
+                int upX = ChartArea.Width - 250;
+                int iTrades = 0;
 
-                upY += tsize.Height + 6;
-                if (TradingManager.Position != null)
+                if (bShowPNL)
+                    if (TradingManager.Portfolio != null)
+                    {
+                        var txt1 = $"Account: {TradingManager.Portfolio.AccountID}";
+                        context.DrawString(txt1, font2, Color.Gray, upX, upY);
+                        var tsize = context.MeasureString(txt1, font2);
+
+                        upY += tsize.Height + 6;
+                        if (TradingManager.Position != null)
+                        {
+                            tsize = context.MeasureString(txt1, fontB);
+                            txt1 = $"Total PNL: {TradingManager.Position.RealizedPnL}";
+                            if (TradingManager.Position.RealizedPnL > 0)
+                                context.DrawString(txt1, fontB, Color.Lime, upX, upY);
+                            else
+                                context.DrawString(txt1, fontB, Color.Red, upX, upY);
+                        }
+                        upY += tsize.Height + 6;
+                        var myTrades = TradingManager.MyTrades;
+                        if (myTrades.Any())
+                        {
+                            foreach (var myTrade in myTrades)
+                                iTrades++;
+                            tsize = context.MeasureString(txt1, font2);
+                            txt1 = $"Total Trades: " + iTrades;
+                            context.DrawString(txt1, font2, Color.Gray, upX, upY);
+                        }
+                    }
+
+                if (bShowNews)
                 {
-                    tsize = context.MeasureString(txt1, fontB);
-                    txt1 = $"Total PNL: {TradingManager.Position.RealizedPnL}";
-                    if (TradingManager.Position.RealizedPnL > 0)
-                        context.DrawString(txt1, fontB, Color.Lime, upX, upY);
-                    else
-                        context.DrawString(txt1, fontB, Color.Red, upX, upY);
+                    RenderFont font;
+                    Size textSize;
+                    int currY = 40;
+
+                    font = new RenderFont("Arial", iNewsFont + 2);
+                    textSize = context.MeasureString("Today's News:", font);
+                    context.DrawString("Today's News:", font, Color.YellowGreen, 50, currY);
+                    currY += textSize.Height + 10;
+                    font = new RenderFont("Arial", iNewsFont);
+
+                    foreach (string s in lsH)
+                    {
+                        textSize = context.MeasureString(s, font);
+                        context.DrawString("High - " + s, font, Color.DarkOrange, 50, currY);
+                        currY += textSize.Height;
+                    }
+                    currY += 9;
+                    foreach (string s in lsM)
+                    {
+                        textSize = context.MeasureString(s, font);
+                        context.DrawString("Med  - " + s, font, Color.Gray, 50, currY);
+                        currY += textSize.Height;
+                    }
                 }
-                upY += tsize.Height + 6;
-                var myTrades = TradingManager.MyTrades;
-                if (myTrades.Any())
-                {
-                    foreach (var myTrade in myTrades)
-                        iTrades++;
-                    tsize = context.MeasureString(txt1, font2);
-                    txt1 = $"Total Trades: " + iTrades;
-                    context.DrawString(txt1, font2, Color.Gray, upX, upY);
-                }
-            }
 
-            if (! bShowNews)
-                return;
-
-            RenderFont font;
-            Size textSize;
-            int currY = 40;
-
-            font = new RenderFont("Arial", iNewsFont + 2);
-            textSize = context.MeasureString("Today's News:", font);
-            context.DrawString("Today's News:", font, Color.YellowGreen, 50, currY);
-            currY += textSize.Height + 10;
-            font = new RenderFont("Arial", iNewsFont);
-
-            foreach (string s in lsH)
-            {
-                textSize = context.MeasureString(s, font);
-                context.DrawString("High - " + s, font, Color.DarkOrange, 50, currY);
-                currY += textSize.Height;
-            }
-            currY += 9;
-            foreach (string s in lsM)
-            {
-                textSize = context.MeasureString(s, font);
-                context.DrawString("Med  - " + s, font, Color.Gray, 50, currY);
-                currY += textSize.Height;
             }
         }
 
@@ -353,12 +368,14 @@
         private ValueDataSeries _upTrend = new("Up SuperTrend") { Color = DefaultColors.Blue.Convert(), Width = 2, VisualType = VisualMode.Square, ShowZeroValue = false };
         private readonly ValueDataSeries _squeezie = new("Squeeze Relaxer") { Color = MColors.Yellow, VisualType = VisualMode.Dots, Width = 3 };
         private readonly ValueDataSeries _nine21 = new("9 21 cross") { Color = MColor.FromArgb(255, 0, 255, 0), VisualType = VisualMode.Block, Width = 4 };
-        private readonly ValueDataSeries _posSeries = new("Regular Buy Signal") { Color = MColor.FromArgb(255, 0, 255, 0), VisualType = VisualMode.UpArrow, Width = 2 };
-        private readonly ValueDataSeries _negSeries = new("Regular Sell Signal") { Color = MColor.FromArgb(255, 255, 0, 0), VisualType = VisualMode.DownArrow, Width = 2 };
         private readonly ValueDataSeries _posWhite = new("Vol Imbalance Sell") { Color = MColors.White, VisualType = VisualMode.DownArrow, Width = 1 };
         private readonly ValueDataSeries _negWhite = new("Vol Imbalance Buy") { Color = MColors.White, VisualType = VisualMode.UpArrow, Width = 1 };
-        private readonly ValueDataSeries _posRev = new("Top Reversal") { Color = MColors.LightPink, VisualType = VisualMode.Block, Width = 2 };
-        private readonly ValueDataSeries _negRev = new("Bottom Reversal") { Color = MColors.LightGreen, VisualType = VisualMode.Block, Width = 2 };
+
+        private readonly ValueDataSeries _posRev = new("Impulse Buy") { Color = MColors.LightGreen, VisualType = VisualMode.UpArrow, Width = 2 };
+        private readonly ValueDataSeries _negRev = new("Impulse Sell") { Color = MColors.LightPink, VisualType = VisualMode.DownArrow, Width = 2 };
+
+        private readonly ValueDataSeries _posSeries = new("Regular Buy Signal") { Color = MColor.FromArgb(255, 0, 255, 0), VisualType = VisualMode.Dots, Width = 2 };
+        private readonly ValueDataSeries _negSeries = new("Regular Sell Signal") { Color = MColor.FromArgb(255, 255, 104, 48), VisualType = VisualMode.Dots, Width = 2 };
 
         #endregion
 
@@ -372,7 +389,8 @@
                     new Entity { Value = 1, Name = "None" },
                     new Entity { Value = 2, Name = "Waddah Explosion" },
                     new Entity { Value = 3, Name = "Squeeze" },
-                    new Entity { Value = 4, Name = "Delta" }
+                    new Entity { Value = 4, Name = "Delta" },
+                    new Entity { Value = 5, Name = "MACD" }
                 })
             { }
         }
@@ -392,6 +410,12 @@
         public int WaddaSensitivity
         {
             get => iWaddaSensitivity; set { if (value < 0) return; iWaddaSensitivity = value; RecalculateValues(); }
+        }
+        [Display(GroupName = "Colored Candles", Name = "MACD Sensitivity")]
+        [Range(0, 9000)]
+        public int MACDSensitivity
+        {
+            get => iMACDSensitivity; set { if (value < 0) return; iMACDSensitivity = value; RecalculateValues(); }
         }
 
         [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "UseAlerts")]
@@ -551,6 +575,7 @@
 
             #region CANDLE CALCULATIONS
 
+            var pcandle = GetCandle(bar);
             var candle = GetCandle(bar - 1);
             var pbar = bar - 1;
             value = candle.Close;
@@ -623,9 +648,9 @@
             var ao = ((ValueDataSeries)_ao.DataSeries[0])[pbar];
             var kama9 = ((ValueDataSeries)_kama9.DataSeries[0])[pbar];
             var kama21 = ((ValueDataSeries)_kama9.DataSeries[0])[pbar];
-            var m1 = ((ValueDataSeries)_macd.DataSeries[0])[pbar];
-            var m2 = ((ValueDataSeries)_macd.DataSeries[1])[pbar];
-            var m3 = ((ValueDataSeries)_macd.DataSeries[2])[pbar];
+            var m1 = ((ValueDataSeries)_macd.DataSeries[0])[pbar]; // macd
+            var m2 = ((ValueDataSeries)_macd.DataSeries[1])[pbar]; // signal
+            var m3 = ((ValueDataSeries)_macd.DataSeries[2])[pbar]; // difference
             var t3 = ((ValueDataSeries)_t3.DataSeries[0])[pbar];
             var fast = ((ValueDataSeries)fastEma.DataSeries[0])[pbar];
             var fastM = ((ValueDataSeries)fastEma.DataSeries[0])[pbar - 1];
@@ -652,6 +677,7 @@
             var prev_twone = ((ValueDataSeries)_21.DataSeries[0])[pbar - 1];
             var myema = ((ValueDataSeries)_myEMA.DataSeries[0])[pbar];
             var psar = ((ValueDataSeries)_psar.DataSeries[0])[pbar];
+            var ppsar = ((ValueDataSeries)_psar.DataSeries[0])[bar];
             var bb_mid = ((ValueDataSeries)_bb.DataSeries[0])[pbar]; // mid
             var bb_top = ((ValueDataSeries)_bb.DataSeries[1])[pbar]; // top
             var bb_bottom = ((ValueDataSeries)_bb.DataSeries[2])[pbar]; // bottom
@@ -664,7 +690,9 @@
             var macdUp = (m1 > m2);
             var macdDown = (m1 < m2);
             var psarBuy = (psar < candle.Close);
+            var ppsarBuy = (ppsar < pcandle.Close);
             var psarSell = (psar > candle.Close);
+            var ppsarSell = (ppsar > pcandle.Close);
 
             #endregion
 
@@ -734,54 +762,39 @@
             if (red && bShowDown)
                 _negSeries[pbar] = candle.High + _tick * 2;
 
-            if (_lastBar != bar)
+            if (canColor > 1)
             {
-                if (_lastBarCounted && UseAlerts)
-                {
-                    if (bVolumeImbalances)
-                        if ((green && c1G && candle.Open > p1C.Close) || (red && c1R && candle.Open < p1C.Close))
-                            AddAlert(AlertFile, "Volume Imbalance");
+                var waddah = Math.Min(Math.Abs(t1) + 70, 255);
+                if (canColor == 2)
+                    _paintBars[pbar] = t1 > 0 ? MColor.FromArgb(255, 0, (byte)waddah, 0) : MColor.FromArgb(255, (byte)waddah, 0, 0);
 
-                    if (bShowUp)
-                        AddAlert(AlertFile, "BUY Signal");
-                    else if (bShowDown)
-                        AddAlert(AlertFile, "BUY Signal");
-                }
-                _lastBar = bar;
+                var filteredSQ = Math.Min(Math.Abs(sq1 * 25), 255);
+                if (canColor == 3)
+                    _paintBars[pbar] = sq1 > 0 ? MColor.FromArgb(255, 0, (byte)filteredSQ, 0) : MColor.FromArgb(255, (byte)filteredSQ, 0, 0);
+
+                var filteredDelta = Math.Min(Math.Abs(candle.Delta), 255);
+                if (canColor == 4)
+                    _paintBars[pbar] = candle.Delta > 0 ? MColor.FromArgb(255, 0, (byte)filteredDelta, 0) : MColor.FromArgb(255, (byte)filteredDelta, 0, 0);
+
+                var filteredLinda = Math.Min(Math.Abs(m3 * iMACDSensitivity), 255);
+                if (canColor == 5)
+                    _paintBars[pbar] = m3 > 0 ? MColor.FromArgb(255, 0, (byte)filteredLinda, 0) : MColor.FromArgb(255, (byte)filteredLinda, 0, 0);
             }
-            else
-            {
-                if (!_lastBarCounted)
-                    _lastBarCounted = true;
-            }
-
-            var waddah = Math.Min(Math.Abs(t1) + 70, 255);
-            if (canColor == 2) // (bWaddahCandles)
-                _paintBars[pbar] = t1 > 0 ? MColor.FromArgb(255, 0, (byte)waddah, 0) : MColor.FromArgb(255, (byte)waddah, 0, 0);
-
-            var filteredSQ = Math.Min(Math.Abs(sq1 * 25), 255);
-            if (canColor == 3) // (bSqueezeCandles)
-                _paintBars[pbar] = sq1 > 0 ? MColor.FromArgb(255, 0, (byte)filteredSQ, 0) : MColor.FromArgb(255, (byte)filteredSQ, 0, 0);
-
-            var filteredDelta = Math.Min(Math.Abs(candle.Delta), 255);
-            if (canColor == 4) // (bDeltaCandles)
-                _paintBars[pbar] = candle.Delta > 0 ? MColor.FromArgb(255, 0, (byte)filteredDelta, 0) : MColor.FromArgb(255, (byte)filteredDelta, 0, 0);
 
             // =======================    REVERSAL PATTERNS    ========================
 
             if (bShowRevPattern)
             {
                 if (c0R && candle.High > bb_top && candle.Open < bb_top && candle.Open > p1C.Close && upWickLarger)
-                    DrawText(pbar, "Wick", Color.Yellow, Color.Transparent);
+                    DrawText(pbar, "Wick", Color.Yellow, Color.Transparent, false, true);
                 if (c0G && candle.Low < bb_bottom && candle.Open > bb_bottom && candle.Open > p1C.Close && downWickLarger)
-                    DrawText(pbar, "Wick", Color.Yellow, Color.Transparent);
+                    DrawText(pbar, "Wick", Color.Yellow, Color.Transparent, false, true);
 
                 if (c0G && c1R && c2R && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta < 0)
                     DrawText(pbar, "Vol\nRev", Color.Yellow, Color.Transparent, false, true);
                 if (c0R && c1G && c2G && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta > 0)
                     DrawText(pbar, "Vol\nRev", Color.Lime, Color.Transparent, false, true);
 
-                // _paintBars[bar] = Colors.Yellow;
                 if (ThreeOutUp)
                     DrawText(pbar, "3oU", Color.Yellow, Color.Transparent);
                 if (ThreeOutDown && bShowRevPattern)
@@ -812,9 +825,43 @@
                     DrawText(pbar, "TR", Color.Yellow, Color.BlueViolet, false, true);
             }
 
+            if (psarBuy && m3 > 0 && candle.Delta > 50 && !bBigArrowUp)
+            {
+                _posRev[bar] = candle.Low - (_tick * 2);
+                bBigArrowUp = true;
+            }
+            if (psarSell && m3 < 0 && candle.Delta < 50 && bBigArrowUp)
+            {
+                _negRev[bar] = candle.High + (_tick * 2);
+                bBigArrowUp = false;
+            }
+
+            if (_lastBar != bar)
+            {
+                if (_lastBarCounted && UseAlerts)
+                {
+                    if (bVolumeImbalances)
+                        if ((green && c1G && candle.Open > p1C.Close) || (red && c1R && candle.Open < p1C.Close))
+                            AddAlert(AlertFile, "Volume Imbalance");
+
+                    if (bShowUp)
+                        AddAlert(AlertFile, "BUY Signal");
+                    else if (bShowDown)
+                        AddAlert(AlertFile, "BUY Signal");
+
+                    if ((ppsarBuy && m3 > 0 && candle.Delta > 50 && !bBigArrowUp) || (ppsarSell && m3 < 0 && candle.Delta < 50 && bBigArrowUp))
+                        AddAlert(AlertFile, "Big Arrow");
+                }
+                _lastBar = bar;
+            }
+            else
+            {
+                if (!_lastBarCounted)
+                    _lastBarCounted = true;
+            }
+
             if (!bNewsProcessed && bShowNews)
                 LoadStock(pbar);
-
         }
 
         private String EvilTimes(int bar)
