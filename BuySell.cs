@@ -203,13 +203,13 @@
 
         [Display(GroupName = "Cluster Signals", Name = "Show Cluster Lines")]
         public bool ShowClusters { get => bShowClusters; set { bShowClusters = value; RecalculateValues(); } }
-        [Display(GroupName = "Cluster Signals", Name = "Waddah Sensitivity")]
+        [Display(GroupName = "Cluster Signals", Name = "Cluster Volume Ratio")]
         [Range(0, 9000)]
         public int ClusterRatio { get => iClusterRatio; set { if (value < 0) return; iClusterRatio = value; RecalculateValues(); } }
-        [Display(GroupName = "Cluster Signals", Name = "Waddah Sensitivity")]
+        [Display(GroupName = "Cluster Signals", Name = "Minimum Bid")]
         [Range(0, 9000)]
         public int MinBid { get => iMinBid; set { if (value < 0) return; iMinBid = value; RecalculateValues(); } }
-        [Display(GroupName = "Cluster Signals", Name = "Waddah Sensitivity")]
+        [Display(GroupName = "Cluster Signals", Name = "Minimum Ask")]
         [Range(0, 9000)]
         public int MinAsk { get => iMinAsk; set { if (value < 0) return; iMinAsk = value; RecalculateValues(); } }
 
