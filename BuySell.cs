@@ -90,6 +90,7 @@
         private bool bAdvanced = false;
         private bool bShowStar = false;
         private bool bShowEvil = false;
+        private bool bShowClusters = false;
 
         private int iMinDelta = 0;
         private int iMinDeltaPercent = 0;
@@ -98,11 +99,134 @@
         private int iKAMAPeriod = 9;
         private int iOffset = 1;
         private int iFontSize = 10;
-        private int iBigTrades = 25000;
         private int iNewsFont = 10;
         private int iWaddaSensitivity = 120;
         private int iMACDSensitivity = 70;
         private int CandleColoring = 0;
+
+        private int iMinBid = 9;
+        private int iMinAsk = 9;
+        private int iClusterRatio = 3;
+
+        #endregion
+
+        #region SETTINGS
+
+        [Display(GroupName = "Buy/Sell Indicators", Name = "Show buy/sell dots")]
+        public bool ShowRegularBuySell { get => bShowRegularBuySell; set { bShowRegularBuySell = value; RecalculateValues(); } }
+        [Display(GroupName = "Buy/Sell Indicators", Name = "Show MACD/PSAR arrow")]
+        public bool ShowBigArrow { get => bShowMACDPSARArrow; set { bShowMACDPSARArrow = value; RecalculateValues(); } }
+
+        private class candleColor : Collection<Entity>
+        {
+            public candleColor()
+                : base(new[]
+                {
+                    new Entity { Value = 1, Name = "None" },
+                    new Entity { Value = 2, Name = "Waddah Explosion" },
+                    new Entity { Value = 3, Name = "Squeeze" },
+                    new Entity { Value = 4, Name = "Delta" },
+                    new Entity { Value = 5, Name = "MACD" }
+                })
+            { }
+        }
+        [Display(Name = "Candle Color", GroupName = "Colored Candles")]
+        [ComboBoxEditor(typeof(candleColor), DisplayMember = nameof(Entity.Name), ValueMember = nameof(Entity.Value))]
+        public int canColor { get => CandleColoring; set { if (value < 0) return; CandleColoring = value; RecalculateValues(); } }
+
+        [Display(GroupName = "Colored Candles", Name = "Show Reversal Patterns")]
+        public bool ShowRevPattern { get => bShowRevPattern; set { bShowRevPattern = value; RecalculateValues(); } }
+        [Display(GroupName = "Colored Candles", Name = "Show Advanced Ideas")]
+        public bool ShowBrooks { get => bAdvanced; set { bAdvanced = value; RecalculateValues(); } }
+        [Display(GroupName = "Colored Candles", Name = "Waddah Sensitivity")]
+        [Range(0, 9000)]
+        public int WaddaSensitivity { get => iWaddaSensitivity; set { if (value < 0) return; iWaddaSensitivity = value; RecalculateValues(); } }
+        [Display(GroupName = "Colored Candles", Name = "MACD Sensitivity")]
+        [Range(0, 9000)]
+        public int MACDSensitivity { get => iMACDSensitivity; set { if (value < 0) return; iMACDSensitivity = value; RecalculateValues(); } }
+
+        [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "UseAlerts")]
+        public bool UseAlerts { get; set; }
+        [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "AlertFile")]
+        public string AlertFile { get; set; } = "alert1";
+
+        [Display(GroupName = "Extras", Name = "Show Triple Supertrend")]
+        public bool ShowTripleSupertrend { get => bShowTripleSupertrend; set { bShowTripleSupertrend = value; RecalculateValues(); } }
+        [Display(GroupName = "Extras", Name = "Show 9/21 EMA Cross")]
+        public bool Show_9_21_EMA_Cross { get => bShow921; set { bShow921 = value; RecalculateValues(); } }
+        [Display(GroupName = "Extras", Name = "Show Squeeze Relaxer")]
+        public bool Show_Squeeze_Relax { get => bShowSqueeze; set { bShowSqueeze = value; RecalculateValues(); } }
+        [Display(GroupName = "Extras", Name = "Show Volume Imbalances", Description = "Show gaps between two candles, indicating market strength")]
+        public bool Use_VolumeImbalances { get => bVolumeImbalances; set { bVolumeImbalances = value; RecalculateValues(); } }
+        [Display(GroupName = "Extras", Name = "Show Nebula Cloud", Description = "Show cloud containing KAMA 9 and 21")]
+        public bool Use_Cloud { get => bShowCloud; set { bShowCloud = value; RecalculateValues(); } }
+        [Display(GroupName = "Extras", Name = "Show Trampoline", Description = "Trampoline is the ultimate reversal indicator")]
+        public bool Use_Tramp { get => bShowTramp; set { bShowTramp = value; RecalculateValues(); } }
+
+        [Display(GroupName = "Extras", Name = "Show Evil Times", Description = "Market timing from FighterOfEvil, on Discord")]
+        public bool ShowEvil { get => bShowEvil; set { bShowEvil = value; RecalculateValues(); } }
+        [Display(GroupName = "Extras", Name = "Show Star Times", Description = "Market timing from Star, on Discord")]
+        public bool ShowStar { get => bShowStar; set { bShowStar = value; RecalculateValues(); } }
+
+        [Display(GroupName = "High Impact News", Name = "Show today's news")]
+        public bool Show_News { get => bShowNews; set { bShowNews = value; RecalculateValues(); } }
+        [Display(GroupName = "High Impact News", Name = "Show PNL on screen")]
+        public bool Show_PNL { get => bShowPNL; set { bShowPNL = value; RecalculateValues(); } }
+        [Display(GroupName = "High Impact News", Name = "News font")]
+        [Range(1, 900)]
+        public int NewsFont
+        { get => iNewsFont; set { iNewsFont = value; RecalculateValues(); } }
+
+        // ========================================================================
+        // =======================    FILTER INDICATORS    ========================
+        // ========================================================================
+
+        [Display(GroupName = "Buy/Sell Filters", Name = "Waddah Explosion", Description = "The Waddah Explosion must be the correct color, and have a value")]
+        public bool Use_Waddah_Explosion { get => bUseWaddah; set { bUseWaddah = value; RecalculateValues(); } }
+        [Display(GroupName = "Buy/Sell Filters", Name = "Awesome Oscillator", Description = "AO is positive or negative")]
+        public bool Use_Awesome { get => bUseAO; set { bUseAO = value; RecalculateValues(); } }
+        [Display(GroupName = "Buy/Sell Filters", Name = "Parabolic SAR", Description = "The PSAR must be signaling a buy/sell signal same as the arrow")]
+        public bool Use_PSAR { get => bUsePSAR; set { bUsePSAR = value; RecalculateValues(); } }
+        [Display(GroupName = "Buy/Sell Filters", Name = "Squeeze Momentum", Description = "The squeeze must be the correct color")]
+        public bool Use_Squeeze_Momentum { get => bUseSqueeze; set { bUseSqueeze = value; RecalculateValues(); } }
+        [Display(GroupName = "Buy/Sell Filters", Name = "MACD", Description = "Standard 12/26/9 MACD crossing in the correct direction")]
+        public bool Use_MACD { get => bUseMACD; set { bUseMACD = value; RecalculateValues(); } }
+        [Display(GroupName = "Buy/Sell Filters", Name = "SuperTrend", Description = "Price must align to the current SuperTrend trend")]
+        public bool Use_SuperTrend { get => bUseSuperTrend; set { bUseSuperTrend = value; RecalculateValues(); } }
+        [Display(GroupName = "Buy/Sell Filters", Name = "T3", Description = "Price must cross the T3")]
+        public bool Use_T3 { get => bUseT3; set { bUseT3 = value; RecalculateValues(); } }
+        [Display(GroupName = "Buy/Sell Filters", Name = "Fisher Transform", Description = "Fisher Transform must cross to the correct direction")]
+        public bool Use_Fisher_Transform { get => bUseFisher; set { bUseFisher = value; RecalculateValues(); } }
+        [Display(GroupName = "Buy/Sell Filters", Name = "Minimum ADX", Description = "Minimum ADX value before showing buy/sell")]
+        [Range(0, 100)]
+        public int Min_ADX { get => iMinADX; set { if (value < 0) return; iMinADX = value; RecalculateValues(); } }
+
+        [Display(GroupName = "Cluster Signals", Name = "Show Cluster Lines")]
+        public bool ShowClusters { get => bShowClusters; set { bShowClusters = value; RecalculateValues(); } }
+        [Display(GroupName = "Cluster Signals", Name = "Waddah Sensitivity")]
+        [Range(0, 9000)]
+        public int ClusterRatio { get => iClusterRatio; set { if (value < 0) return; iClusterRatio = value; RecalculateValues(); } }
+        [Display(GroupName = "Cluster Signals", Name = "Waddah Sensitivity")]
+        [Range(0, 9000)]
+        public int MinBid { get => iMinBid; set { if (value < 0) return; iMinBid = value; RecalculateValues(); } }
+        [Display(GroupName = "Cluster Signals", Name = "Waddah Sensitivity")]
+        [Range(0, 9000)]
+        public int MinAsk { get => iMinAsk; set { if (value < 0) return; iMinAsk = value; RecalculateValues(); } }
+
+        [Display(GroupName = "Custom MA Filter", Name = "Use Custom EMA", Description = "Price crosses your own EMA period")]
+        public bool Use_Custom_EMA { get => bUseMyEMA; set { bUseMyEMA = value; RecalculateValues(); } }
+        [Display(GroupName = "Custom MA Filter", Name = "Custom EMA Period", Description = "Price crosses your own EMA period")]
+        [Range(1, 1000)]
+        public int Custom_EMA_Period
+        { get => iMyEMAPeriod; set { if (value < 1) return; iMyEMAPeriod = _myEMA.Period = value;RecalculateValues(); }        }
+
+        [Display(GroupName = "Custom MA Filter", Name = "Use KAMA", Description = "Price crosses KAMA")]
+        public bool Use_KAMA { get => bUseKAMA; set { bUseKAMA = value; RecalculateValues(); } }
+        [Display(GroupName = "Custom MA Filter", Name = "KAMA Period", Description = "Price crosses KAMA")]
+        [Range(1, 1000)]
+        public int Custom_KAMA_Period { get => iKAMAPeriod; set { if (value < 1) return; iKAMAPeriod = _kama9.EfficiencyRatioPeriod = value; RecalculateValues(); } }
+
+        private decimal VolSec(IndicatorCandle c) { return c.Volume / Convert.ToDecimal((c.LastTime - c.Time).TotalSeconds); }
 
         #endregion
 
@@ -373,137 +497,11 @@
         private readonly ValueDataSeries _posWhite = new("Vol Imbalance Sell") { Color = MColors.White, VisualType = VisualMode.DownArrow, Width = 1 };
         private readonly ValueDataSeries _negWhite = new("Vol Imbalance Buy") { Color = MColors.White, VisualType = VisualMode.UpArrow, Width = 1 };
 
-        private readonly ValueDataSeries _posRev = new("Impulse Buy") { Color = MColors.LightGreen, VisualType = VisualMode.UpArrow, Width = 2 };
-        private readonly ValueDataSeries _negRev = new("Impulse Sell") { Color = MColors.LightPink, VisualType = VisualMode.DownArrow, Width = 2 };
+        private readonly ValueDataSeries _posRev = new("MACD/PSAR Buy Arrow") { Color = MColors.LightGreen, VisualType = VisualMode.UpArrow, Width = 2 };
+        private readonly ValueDataSeries _negRev = new("MACD/PSAR Sell Arrow") { Color = MColors.LightPink, VisualType = VisualMode.DownArrow, Width = 2 };
 
         private readonly ValueDataSeries _posSeries = new("Regular Buy Signal") { Color = MColor.FromArgb(255, 0, 255, 0), VisualType = VisualMode.Dots, Width = 2 };
         private readonly ValueDataSeries _negSeries = new("Regular Sell Signal") { Color = MColor.FromArgb(255, 255, 104, 48), VisualType = VisualMode.Dots, Width = 2 };
-
-        #endregion
-
-        #region SETTINGS
-
-        [Display(GroupName = "Buy/Sell Indicators", Name = "Show buy/sell dots")]
-        public bool ShowRegularBuySell { get => bShowRegularBuySell; set { bShowRegularBuySell = value; RecalculateValues(); } }
-        [Display(GroupName = "Buy/Sell Indicators", Name = "Show MACD/PSAR arrow")]
-        public bool ShowBigArrow { get => bShowMACDPSARArrow; set { bShowMACDPSARArrow = value; RecalculateValues(); } }
-
-        private class candleColor : Collection<Entity>
-        {
-            public candleColor()
-                : base(new[]
-                {
-                    new Entity { Value = 1, Name = "None" },
-                    new Entity { Value = 2, Name = "Waddah Explosion" },
-                    new Entity { Value = 3, Name = "Squeeze" },
-                    new Entity { Value = 4, Name = "Delta" },
-                    new Entity { Value = 5, Name = "MACD" }
-                })
-            { }
-        }
-        [Display(Name = "Candle Color", GroupName = "Colored Candles")]
-        [ComboBoxEditor(typeof(candleColor), DisplayMember = nameof(Entity.Name), ValueMember = nameof(Entity.Value))]
-        public int canColor
-        {
-            get => CandleColoring; set { if (value < 0) return; CandleColoring = value; RecalculateValues(); }
-        }
-
-        [Display(GroupName = "Colored Candles", Name = "Show Reversal Patterns")]
-        public bool ShowRevPattern { get => bShowRevPattern; set { bShowRevPattern = value; RecalculateValues(); } }
-        [Display(GroupName = "Colored Candles", Name = "Show Advanced Ideas")]
-        public bool ShowBrooks { get => bAdvanced; set { bAdvanced = value; RecalculateValues(); } }
-        [Display(GroupName = "Colored Candles", Name = "Waddah Sensitivity")]
-        [Range(0, 9000)]
-        public int WaddaSensitivity
-        {
-            get => iWaddaSensitivity; set { if (value < 0) return; iWaddaSensitivity = value; RecalculateValues(); }
-        }
-        [Display(GroupName = "Colored Candles", Name = "MACD Sensitivity")]
-        [Range(0, 9000)]
-        public int MACDSensitivity
-        {
-            get => iMACDSensitivity; set { if (value < 0) return; iMACDSensitivity = value; RecalculateValues(); }
-        }
-
-        [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "UseAlerts")]
-        public bool UseAlerts { get; set; }
-        [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "AlertFile")]
-        public string AlertFile { get; set; } = "alert1";
-
-        [Display(GroupName = "Extras", Name = "Show Triple Supertrend")]
-        public bool ShowTripleSupertrend { get => bShowTripleSupertrend; set { bShowTripleSupertrend = value; RecalculateValues(); } }
-        [Display(GroupName = "Extras", Name = "Show 9/21 EMA Cross")]
-        public bool Show_9_21_EMA_Cross { get => bShow921; set { bShow921 = value; RecalculateValues(); } }
-        [Display(GroupName = "Extras", Name = "Show Squeeze Relaxer")]
-        public bool Show_Squeeze_Relax { get => bShowSqueeze; set { bShowSqueeze = value; RecalculateValues(); } }
-        [Display(GroupName = "Extras", Name = "Show Volume Imbalances", Description = "Show gaps between two candles, indicating market strength")] 
-        public bool Use_VolumeImbalances { get => bVolumeImbalances; set { bVolumeImbalances = value; RecalculateValues(); } }
-        [Display(GroupName = "Extras", Name = "Show Nebula Cloud", Description = "Show cloud containing KAMA 9 and 21")]
-        public bool Use_Cloud { get => bShowCloud; set { bShowCloud = value; RecalculateValues(); } }
-        [Display(GroupName = "Extras", Name = "Show Trampoline", Description = "Trampoline is the ultimate reversal indicator")]
-        public bool Use_Tramp { get => bShowTramp; set { bShowTramp = value; RecalculateValues(); } }
-
-        [Display(GroupName = "Extras", Name = "Show Evil Times", Description = "Market timing from FighterOfEvil, on Discord")]
-        public bool ShowEvil { get => bShowEvil; set { bShowEvil = value; RecalculateValues(); } }
-        [Display(GroupName = "Extras", Name = "Show Star Times", Description = "Market timing from Star, on Discord")]
-        public bool ShowStar { get => bShowStar; set { bShowStar = value; RecalculateValues(); } }
-
-        [Display(GroupName = "High Impact News", Name = "Show today's news")]
-        public bool Show_News { get => bShowNews; set { bShowNews = value; RecalculateValues(); } }
-        [Display(GroupName = "High Impact News", Name = "Show PNL on screen")]
-        public bool Show_PNL { get => bShowPNL; set { bShowPNL = value; RecalculateValues(); } }
-        [Display(GroupName = "High Impact News", Name = "News font")]
-        [Range(1, 900)]
-        public int NewsFont
-        { get => iNewsFont; set { iNewsFont = value; RecalculateValues(); } }
-
-        // ========================================================================
-        // =======================    FILTER INDICATORS    ========================
-        // ========================================================================
-
-        [Display(GroupName = "Buy/Sell Filters", Name = "Waddah Explosion", Description = "The Waddah Explosion must be the correct color, and have a value")]
-        public bool Use_Waddah_Explosion { get => bUseWaddah; set { bUseWaddah = value; RecalculateValues(); } }
-        [Display(GroupName = "Buy/Sell Filters", Name = "Awesome Oscillator", Description = "AO is positive or negative")]
-        public bool Use_Awesome { get => bUseAO; set { bUseAO = value; RecalculateValues(); } }
-        [Display(GroupName = "Buy/Sell Filters", Name = "Parabolic SAR", Description = "The PSAR must be signaling a buy/sell signal same as the arrow")]
-        public bool Use_PSAR { get => bUsePSAR; set { bUsePSAR = value; RecalculateValues(); } }
-        [Display(GroupName = "Buy/Sell Filters", Name = "Squeeze Momentum", Description = "The squeeze must be the correct color")]
-        public bool Use_Squeeze_Momentum { get => bUseSqueeze; set { bUseSqueeze = value; RecalculateValues(); } }
-        [Display(GroupName = "Buy/Sell Filters", Name = "MACD", Description = "Standard 12/26/9 MACD crossing in the correct direction")]
-        public bool Use_MACD { get => bUseMACD; set { bUseMACD = value; RecalculateValues(); } }
-        [Display(GroupName = "Buy/Sell Filters", Name = "SuperTrend", Description = "Price must align to the current SuperTrend trend")]
-        public bool Use_SuperTrend { get => bUseSuperTrend; set { bUseSuperTrend = value; RecalculateValues(); } }
-        [Display(GroupName = "Buy/Sell Filters", Name = "T3", Description = "Price must cross the T3")]
-        public bool Use_T3 { get => bUseT3; set { bUseT3 = value; RecalculateValues(); } }
-        [Display(GroupName = "Buy/Sell Filters", Name = "Fisher Transform", Description = "Fisher Transform must cross to the correct direction")]
-        public bool Use_Fisher_Transform { get => bUseFisher; set { bUseFisher = value; RecalculateValues(); } }
-        [Display(GroupName = "Buy/Sell Filters", Name = "Minimum ADX", Description = "Minimum ADX value before showing buy/sell")]
-        [Range(0, 100)]
-        public int Min_ADX { get => iMinADX; set { if (value < 0) return; iMinADX = value; RecalculateValues(); } }
-
-        [Display(GroupName = "Custom MA Filter", Name = "Use Custom EMA", Description = "Price crosses your own EMA period")]
-        public bool Use_Custom_EMA { get => bUseMyEMA; set { bUseMyEMA = value; RecalculateValues(); } }
-        [Display(GroupName = "Custom MA Filter", Name = "Custom EMA Period", Description = "Price crosses your own EMA period")]
-        [Range(1, 1000)]
-        public int Custom_EMA_Period
-        {
-            get => iMyEMAPeriod;
-            set
-            {
-                if (value < 1)
-                    return;
-                iMyEMAPeriod = _myEMA.Period = value;
-                RecalculateValues();
-            }
-        }
-
-        [Display(GroupName = "Custom MA Filter", Name = "Use KAMA", Description = "Price crosses KAMA")]
-        public bool Use_KAMA { get => bUseKAMA; set { bUseKAMA = value; RecalculateValues(); } }
-        [Display(GroupName = "Custom MA Filter", Name = "KAMA Period", Description = "Price crosses KAMA")]
-        [Range(1, 1000)]
-        public int Custom_KAMA_Period { get => iKAMAPeriod; set { if (value < 1) return; iKAMAPeriod = _kama9.EfficiencyRatioPeriod = value; RecalculateValues(); } }
-
-        private decimal VolSec(IndicatorCandle c) { return c.Volume / Convert.ToDecimal((c.LastTime - c.Time).TotalSeconds); }
 
         #endregion
 
@@ -701,8 +699,6 @@
             var psarSell = (psar > candle.Close);
             var ppsarSell = (ppsar > pcandle.Close);
 
-            #endregion
-
             var eqHigh = c0R && c1R && c2G && c3G && (p1C.High > bb_top || p2C.High > bb_top) &&
                 candle.Close < p1C.Close &&
                 (p1C.Open == p2C.Close || p1C.Open == p2C.Close + _tick || p1C.Open + _tick == p2C.Close);
@@ -713,7 +709,44 @@
 
             var t1 = ((fast - slow) - (fastM - slowM)) * iWaddaSensitivity;
 
-            // ====================    SHOW/OTHER CONDITIONS    =======================
+            #endregion
+
+            // ========================    UP CONDITIONS    ===========================
+
+            if ((candle.Delta < iMinDelta) || (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama9 && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || (x < iMinADX))
+                bShowUp = false;
+
+            if (green && bShowUp && bShowRegularBuySell)
+                _posSeries[pbar] = candle.Low - (_tick * 2);
+
+            // ========================    DOWN CONDITIONS    =========================
+
+            if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) || (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (x < iMinADX))
+                bShowDown = false;
+
+            if (red && bShowDown && bShowRegularBuySell)
+                _negSeries[pbar] = candle.High + _tick * 2;
+
+            if (canColor > 1)
+            {
+                var waddah = Math.Min(Math.Abs(t1) + 70, 255);
+                if (canColor == 2)
+                    _paintBars[pbar] = t1 > 0 ? MColor.FromArgb(255, 0, (byte)waddah, 0) : MColor.FromArgb(255, (byte)waddah, 0, 0);
+
+                var filteredSQ = Math.Min(Math.Abs(sq1 * 25), 255);
+                if (canColor == 3)
+                    _paintBars[pbar] = sq1 > 0 ? MColor.FromArgb(255, 0, (byte)filteredSQ, 0) : MColor.FromArgb(255, (byte)filteredSQ, 0, 0);
+
+                var filteredDelta = Math.Min(Math.Abs(candle.Delta), 255);
+                if (canColor == 4)
+                    _paintBars[pbar] = candle.Delta > 0 ? MColor.FromArgb(255, 0, (byte)filteredDelta, 0) : MColor.FromArgb(255, (byte)filteredDelta, 0, 0);
+
+                var filteredLinda = Math.Min(Math.Abs(m3 * iMACDSensitivity), 255);
+                if (canColor == 5)
+                    _paintBars[pbar] = m3 > 0 ? MColor.FromArgb(255, 0, (byte)filteredLinda, 0) : MColor.FromArgb(255, (byte)filteredLinda, 0, 0);
+            }
+
+            #region ADVANCED LOGIC
 
             if (bShowTripleSupertrend)
             {
@@ -752,43 +785,6 @@
                 if (eqLow)
                     DrawText(pbar - 1, "Equal\nLow", Color.Yellow, Color.Transparent, false, true);
             }
-
-            // ========================    UP CONDITIONS    ===========================
-
-            if ((candle.Delta < iMinDelta) || (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama9 && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || (x < iMinADX))
-                bShowUp = false;
-
-            if (green && bShowUp && bShowRegularBuySell)
-                _posSeries[pbar] = candle.Low - (_tick * 2);
-
-            // ========================    DOWN CONDITIONS    =========================
-
-            if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) || (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (x < iMinADX))
-                bShowDown = false;
-
-            if (red && bShowDown && bShowRegularBuySell)
-                _negSeries[pbar] = candle.High + _tick * 2;
-
-            if (canColor > 1)
-            {
-                var waddah = Math.Min(Math.Abs(t1) + 70, 255);
-                if (canColor == 2)
-                    _paintBars[pbar] = t1 > 0 ? MColor.FromArgb(255, 0, (byte)waddah, 0) : MColor.FromArgb(255, (byte)waddah, 0, 0);
-
-                var filteredSQ = Math.Min(Math.Abs(sq1 * 25), 255);
-                if (canColor == 3)
-                    _paintBars[pbar] = sq1 > 0 ? MColor.FromArgb(255, 0, (byte)filteredSQ, 0) : MColor.FromArgb(255, (byte)filteredSQ, 0, 0);
-
-                var filteredDelta = Math.Min(Math.Abs(candle.Delta), 255);
-                if (canColor == 4)
-                    _paintBars[pbar] = candle.Delta > 0 ? MColor.FromArgb(255, 0, (byte)filteredDelta, 0) : MColor.FromArgb(255, (byte)filteredDelta, 0, 0);
-
-                var filteredLinda = Math.Min(Math.Abs(m3 * iMACDSensitivity), 255);
-                if (canColor == 5)
-                    _paintBars[pbar] = m3 > 0 ? MColor.FromArgb(255, 0, (byte)filteredLinda, 0) : MColor.FromArgb(255, (byte)filteredLinda, 0, 0);
-            }
-
-            // =======================    REVERSAL PATTERNS    ========================
 
             if (bShowRevPattern)
             {
@@ -832,6 +828,8 @@
                     DrawText(pbar, "TR", Color.Yellow, Color.BlueViolet, false, true);
             }
 
+            #endregion
+
             if (ppsarBuy && m3 > 0 && candle.Delta > 50 && !bBigArrowUp && bShowMACDPSARArrow)
             {
                 _posRev[bar] = candle.Low - (_tick * 2);
@@ -843,6 +841,8 @@
                 bBigArrowUp = false;
             }
 
+            #region ALERTS LOGIC
+
             if (_lastBar != bar)
             {
                 if (_lastBarCounted && UseAlerts)
@@ -851,12 +851,12 @@
                         if ((green && c1G && candle.Open > p1C.Close) || (red && c1R && candle.Open < p1C.Close))
                             AddAlert(AlertFile, "Volume Imbalance");
 
-                    if (bShowUp)
+                    if (bShowUp && bShowRegularBuySell)
                         AddAlert(AlertFile, "BUY Signal");
-                    else if (bShowDown)
+                    else if (bShowDown && bShowRegularBuySell)
                         AddAlert(AlertFile, "BUY Signal");
 
-                    if ((ppsarBuy && m3 > 0 && candle.Delta > 50 && !bBigArrowUp) || (ppsarSell && m3 < 0 && candle.Delta < 50 && bBigArrowUp))
+                    if ((ppsarBuy && m3 > 0 && candle.Delta > 50 && !bBigArrowUp) || (ppsarSell && m3 < 0 && candle.Delta < 50 && bBigArrowUp) && bShowMACDPSARArrow)
                         AddAlert(AlertFile, "Big Arrow");
                 }
                 _lastBar = bar;
@@ -866,6 +866,29 @@
                 if (!_lastBarCounted)
                     _lastBarCounted = true;
             }
+
+            #endregion
+
+            #region CLUSTER LOGIC
+
+            if (bShowClusters)
+            {
+                var cPL = candle.GetPriceVolumeInfo(candle.Low);
+                var cPH = candle.GetPriceVolumeInfo(candle.High);
+
+                var gPen = new Pen(new SolidBrush(Color.Lime)) { Width = 4 };
+                var rPen = new Pen(new SolidBrush(Color.Red)) { Width = 4 };
+
+                var vH = Math.Abs(candle.High - candle.ValueArea.ValueAreaHigh);
+                var vL = Math.Abs(candle.ValueArea.ValueAreaLow - candle.Low);
+
+                if ((vH * iClusterRatio) < vL && m3 > 0 && green && cPL.Bid < iMinBid && cPL.Ask < iMinAsk)
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, gPen, 2));
+                else if ((vL * iClusterRatio) < vH && m3 < 0 && red && cPH.Bid < iMinBid && cPH.Ask < iMinAsk)
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, rPen, 2));
+            }
+
+            #endregion
 
             if (!bNewsProcessed && bShowNews)
                 LoadStock(pbar);
