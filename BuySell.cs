@@ -58,16 +58,18 @@
         private bool _lastBarCounted;
         private Color lastColor = Color.White;
         private String lastEvil = "";
+        private bool bShowUp = true;
+        private bool bShowDown = true;
 
         // Default TRUE
         private bool bShowTramp = true;          // SHOW
         private bool bShowNews = true;
-        private bool bShowUp = true;
-        private bool bShowDown = true;
         private bool bUseFisher = true;          // USE
         private bool bUseWaddah = true;
         private bool bUseT3 = true;
         private bool bUsePSAR = true;
+        private bool bShowMACDPSARArrow = true;
+        private bool bShowRegularBuySell = true;
         private bool bVolumeImbalances = true;
 
         // Default FALSE
@@ -380,6 +382,11 @@
         #endregion
 
         #region SETTINGS
+
+        [Display(GroupName = "Buy/Sell Indicators", Name = "Show buy/sell dots")]
+        public bool ShowRegularBuySell { get => bShowRegularBuySell; set { bShowRegularBuySell = value; RecalculateValues(); } }
+        [Display(GroupName = "Buy/Sell Indicators", Name = "Show MACD/PSAR arrow")]
+        public bool ShowBigArrow { get => bShowMACDPSARArrow; set { bShowMACDPSARArrow = value; RecalculateValues(); } }
 
         private class candleColor : Collection<Entity>
         {
@@ -751,7 +758,7 @@
             if ((candle.Delta < iMinDelta) || (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama9 && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || (x < iMinADX))
                 bShowUp = false;
 
-            if (green && bShowUp)
+            if (green && bShowUp && bShowRegularBuySell)
                 _posSeries[pbar] = candle.Low - (_tick * 2);
 
             // ========================    DOWN CONDITIONS    =========================
@@ -759,7 +766,7 @@
             if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) || (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (x < iMinADX))
                 bShowDown = false;
 
-            if (red && bShowDown)
+            if (red && bShowDown && bShowRegularBuySell)
                 _negSeries[pbar] = candle.High + _tick * 2;
 
             if (canColor > 1)
@@ -825,12 +832,12 @@
                     DrawText(pbar, "TR", Color.Yellow, Color.BlueViolet, false, true);
             }
 
-            if (psarBuy && m3 > 0 && candle.Delta > 50 && !bBigArrowUp)
+            if (ppsarBuy && m3 > 0 && candle.Delta > 50 && !bBigArrowUp && bShowMACDPSARArrow)
             {
                 _posRev[bar] = candle.Low - (_tick * 2);
                 bBigArrowUp = true;
             }
-            if (psarSell && m3 < 0 && candle.Delta < 50 && bBigArrowUp)
+            if (ppsarSell && m3 < 0 && candle.Delta < 50 && bBigArrowUp && bShowMACDPSARArrow)
             {
                 _negRev[bar] = candle.High + (_tick * 2);
                 bBigArrowUp = false;
