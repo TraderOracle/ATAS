@@ -271,6 +271,10 @@
 
         #region INDICATORS
 
+        private readonly SMA _Sshort = new SMA() { Period = 3 };
+        private readonly SMA _Slong = new SMA() { Period = 10 };
+        private readonly SMA _Ssignal = new SMA() { Period = 16 };
+
         private readonly RSI _rsi = new() { Period = 14 };
         private readonly ATR _atr = new() { Period = 14 };
         private readonly AwesomeOscillator _ao = new AwesomeOscillator();
@@ -827,6 +831,11 @@
                     c2R && p2C.Low <= (bb_bottom + (_tick * 30)))
                     DrawText(pbar, "TR", Color.Yellow, Color.BlueViolet, false, true);
             }
+
+            // Linda MACD
+            var macd = _Sshort.Calculate(pbar, value) - _Slong.Calculate(pbar, value);
+            var signal = _Ssignal.Calculate(pbar, macd);
+            m3 = macd - signal;
 
             #endregion
 
