@@ -713,6 +713,11 @@
 
             var t1 = ((fast - slow) - (fastM - slowM)) * iWaddaSensitivity;
 
+            // Linda MACD
+            var macd = _Sshort.Calculate(pbar, value) - _Slong.Calculate(pbar, value);
+            var signal = _Ssignal.Calculate(pbar, macd);
+            m3 = macd - signal;
+
             #endregion
 
             // ========================    UP CONDITIONS    ===========================
@@ -831,11 +836,6 @@
                     c2R && p2C.Low <= (bb_bottom + (_tick * 30)))
                     DrawText(pbar, "TR", Color.Yellow, Color.BlueViolet, false, true);
             }
-
-            // Linda MACD
-            var macd = _Sshort.Calculate(pbar, value) - _Slong.Calculate(pbar, value);
-            var signal = _Ssignal.Calculate(pbar, macd);
-            m3 = macd - signal;
 
             #endregion
 
