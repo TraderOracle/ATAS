@@ -29,7 +29,7 @@
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.43";
+        private const String sVersion = "1.44";
         private int iJunk = 0;
         private bool bBigArrowUp = false;
 
@@ -703,6 +703,7 @@
             var psarSell = (psar > candle.Close);
             var ppsarSell = (ppsar > pcandle.Close);
 
+/*
             var eqHigh = c0R && c1R && c2G && c3G && (p1C.High > bb_top || p2C.High > bb_top) &&
                 candle.Close < p1C.Close &&
                 (p1C.Open == p2C.Close || p1C.Open == p2C.Close + _tick || p1C.Open + _tick == p2C.Close);
@@ -710,6 +711,7 @@
             var eqLow = c0G && c1G && c2R && c3R && (p1C.Low < bb_bottom || p2C.Low < bb_bottom) &&
                 candle.Close > p1C.Close &&
                 (p1C.Open == p2C.Close || p1C.Open == p2C.Close + _tick || p1C.Open + _tick == p2C.Close);
+*/
 
             var t1 = ((fast - slow) - (fastM - slowM)) * iWaddaSensitivity;
 
@@ -788,11 +790,6 @@
                     if ((candle.Close > p1C.Close && p1C.Close > p2C.Close && p2C.Close > p3C.Close) ||
                     (candle.Close < p1C.Close && p1C.Close < p2C.Close && p2C.Close < p3C.Close))
                         DrawText(pbar, "Stairs", Color.Yellow, Color.Transparent);
-
-                if (eqHigh)
-                    DrawText(pbar - 1, "Equal\nHigh", Color.Lime, Color.Transparent, false, true);
-                if (eqLow)
-                    DrawText(pbar - 1, "Equal\nLow", Color.Yellow, Color.Transparent, false, true);
             }
 
             if (bShowRevPattern)
