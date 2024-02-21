@@ -57,24 +57,42 @@
             VisualType = VisualMode.Histogram
         };
 
+        private readonly ValueDataSeries _macd = new("MACD Line")
+        {
+            Color = Colors.Orange,
+            VisualType = VisualMode.Line,
+            Width = 4
+        };
+
+        private readonly ValueDataSeries _signal = new("Signal Line")
+        {
+            Color = Colors.Lime,
+            VisualType = VisualMode.Line,
+            Width = 4            
+        };
+
         public LindaMACD()
         {
             Panel = IndicatorDataProvider.NewPanel;
 
             DataSeries[0] = _pos;
             DataSeries.Add(_neg);
+            DataSeries.Add(_macd);
+            DataSeries.Add(_signal);
         }
         protected override void OnCalculate(int bar, decimal value)
         {
             decimal bars = 0;
+            decimal macd = 0;
+            decimal signal = 0;
 
             if (imaType == 1)
             {
                 _Sshort.Period = Short;
                 _Slong.Period = Long;
                 _Ssignal.Period = Signal;
-                var macd = _Sshort.Calculate(bar, value) - _Slong.Calculate(bar, value);
-                var signal = _Ssignal.Calculate(bar, macd);
+                macd = _Sshort.Calculate(bar, value) - _Slong.Calculate(bar, value);
+                signal = _Ssignal.Calculate(bar, macd);
                 bars = macd - signal;
             }
             if (imaType == 2)
@@ -82,8 +100,8 @@
                 _Eshort.Period = Short;
                 _Elong.Period = Long;
                 _Esignal.Period = Signal;
-                var macd = _Eshort.Calculate(bar, value) - _Elong.Calculate(bar, value);
-                var signal = _Esignal.Calculate(bar, macd);
+                macd = _Eshort.Calculate(bar, value) - _Elong.Calculate(bar, value);
+                signal = _Esignal.Calculate(bar, macd);
                 bars = macd - signal;
             }
             if (imaType == 3)
@@ -91,8 +109,8 @@
                 _Wshort.Period = Short;
                 _Wlong.Period = Long;
                 _Wsignal.Period = Signal;
-                var macd = _Wshort.Calculate(bar, value) - _Wlong.Calculate(bar, value);
-                var signal = _Wsignal.Calculate(bar, macd);
+                macd = _Wshort.Calculate(bar, value) - _Wlong.Calculate(bar, value);
+                signal = _Wsignal.Calculate(bar, macd);
                 bars = macd - signal;
             }
             if (imaType == 4)
@@ -100,15 +118,18 @@
                 _Hshort.Period = Short;
                 _Hlong.Period = Long;
                 _Hsignal.Period = Signal;
-                var macd = _Hshort.Calculate(bar, value) - _Hlong.Calculate(bar, value);
-                var signal = _Hsignal.Calculate(bar, macd);
+                macd = _Hshort.Calculate(bar, value) - _Hlong.Calculate(bar, value);
+                signal = _Hsignal.Calculate(bar, macd);
                 bars = macd - signal;
             }
+
+            _macd[bar] = macd;
+            _signal[bar] = signal;
 
             if (bars >= 0)
                 _pos[bar] = bars;
             else
-                _neg[bar] = bars * -1;
+                _neg[bar] = bars;
         }
 
     }
