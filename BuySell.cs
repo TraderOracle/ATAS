@@ -29,7 +29,7 @@
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.44";
+        private const String sVersion = "1.45";
         private int iJunk = 0;
         private bool bBigArrowUp = false;
 
@@ -81,6 +81,7 @@
         private bool bUseKAMA = false;
         private bool bUseMyEMA = false;
         private bool bUseAO = false;
+        private bool bUseHMA = false;
 
         private bool bShow921 = false;
         private bool bShowSqueeze = false;
@@ -191,6 +192,8 @@
         public bool Use_Squeeze_Momentum { get => bUseSqueeze; set { bUseSqueeze = value; RecalculateValues(); } }
         [Display(GroupName = "Buy/Sell Filters", Name = "MACD", Description = "Standard 12/26/9 MACD crossing in the correct direction")]
         public bool Use_MACD { get => bUseMACD; set { bUseMACD = value; RecalculateValues(); } }
+        [Display(GroupName = "Buy/Sell Filters", Name = "Hull Moving Avg", Description = "Price must align to the HMA trend")]
+        public bool Use_HMA { get => bUseHMA; set { bUseHMA = value; RecalculateValues(); } }
         [Display(GroupName = "Buy/Sell Filters", Name = "SuperTrend", Description = "Price must align to the current SuperTrend trend")]
         public bool Use_SuperTrend { get => bUseSuperTrend; set { bUseSuperTrend = value; RecalculateValues(); } }
         [Display(GroupName = "Buy/Sell Filters", Name = "T3", Description = "Price must cross the T3")]
@@ -265,6 +268,7 @@
             Add(_kama9);
             Add(_kama21);
             Add(_atr);
+            Add(_hma);
         }
 
         #endregion
@@ -283,6 +287,7 @@
         private readonly EMA _myEMA = new EMA() { Period = 21 };
         private readonly EMA _9 = new EMA() { Period = 9 };
         private readonly EMA _21 = new EMA() { Period = 21 };
+        private readonly HMA _hma = new HMA() { };
         private readonly EMA fastEma = new EMA() { Period = 20 };
         private readonly EMA slowEma = new EMA() { Period = 40 };
         private readonly FisherTransform _ft = new FisherTransform() { Period = 10 };
@@ -693,7 +698,11 @@
             var rsi = ((ValueDataSeries)_rsi.DataSeries[0])[pbar];
             var rsi1 = ((ValueDataSeries)_rsi.DataSeries[0])[pbar - 1];
             var rsi2 = ((ValueDataSeries)_rsi.DataSeries[0])[pbar - 2];
+            var hma = ((ValueDataSeries)_hma.DataSeries[0])[pbar];
+            var phma = ((ValueDataSeries)_hma.DataSeries[0])[pbar-1];
 
+            var hullUp = hma > phma;
+            var hullDown = hma < phma;
             var fisherUp = (f1 < f2);
             var fisherDown = (f2 < f1);
             var macdUp = (m1 > m2);
@@ -724,7 +733,7 @@
 
             // ========================    UP CONDITIONS    ===========================
 
-            if ((candle.Delta < iMinDelta) || (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama9 && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || (x < iMinADX))
+            if ((candle.Delta < iMinDelta) || (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama9 && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || x < iMinADX || (bUseHMA && hullDown))
                 bShowUp = false;
 
             if (green && bShowUp && bShowRegularBuySell)
@@ -732,7 +741,7 @@
 
             // ========================    DOWN CONDITIONS    =========================
 
-            if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) || (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (x < iMinADX))
+            if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) || (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || x < iMinADX || (bUseHMA && hullUp))
                 bShowDown = false;
 
             if (red && bShowDown && bShowRegularBuySell)
