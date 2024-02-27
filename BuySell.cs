@@ -29,7 +29,7 @@
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.45";
+        private const String sVersion = "1.5";
         private int iJunk = 0;
         private bool bBigArrowUp = false;
 
@@ -92,6 +92,7 @@
         private bool bShowStar = false;
         private bool bShowEvil = false;
         private bool bShowClusters = false;
+        private bool bShowLines = false;
 
         private int iMinDelta = 0;
         private int iMinDeltaPercent = 0;
@@ -150,6 +151,9 @@
         public bool UseAlerts { get; set; }
         [Display(ResourceType = typeof(Resources), GroupName = "Alerts", Name = "AlertFile")]
         public string AlertFile { get; set; } = "alert1";
+
+        [Display(GroupName = "Extras", Name = "Show Kama/EMA 200/VWAP lines")]
+        public bool ShowLines { get => bShowLines; set { bShowLines = value; RecalculateValues(); } }
 
         [Display(GroupName = "Extras", Name = "Show Triple Supertrend")]
         public bool ShowTripleSupertrend { get => bShowTripleSupertrend; set { bShowTripleSupertrend = value; RecalculateValues(); } }
@@ -251,11 +255,15 @@
             DataSeries.Add(_nine21);
             DataSeries.Add(_squeezie);
             DataSeries.Add(_paintBars);
+
             DataSeries.Add(_dnTrend);
             DataSeries.Add(_upTrend);
             DataSeries.Add(_upCloud);
             DataSeries.Add(_dnCloud);
-            DataSeries.Add(_kamanine);
+
+            DataSeries.Add(_lineVWAP);
+            DataSeries.Add(_lineEMA200);
+            DataSeries.Add(_lineKAMA);
 
             Add(_ao);
             Add(_ft);
@@ -266,6 +274,7 @@
             Add(_st3);
             Add(_adx);
             Add(_kama9);
+            Add(_VWAP);
             Add(_kama21);
             Add(_atr);
             Add(_hma);
@@ -274,6 +283,9 @@
         #endregion
 
         #region INDICATORS
+
+        private readonly VWAP _VWAP = new VWAP() { VWAPOnly = true, Type = VWAP.VWAPPeriodType.Daily, TWAPMode = VWAP.VWAPMode.VWAP, VolumeMode = VWAP.VolumeType.Total, Period = 300 };
+        private readonly EMA Ema200 = new EMA() { Period = 200 };
 
         private readonly SMA _Sshort = new SMA() { Period = 3 };
         private readonly SMA _Slong = new SMA() { Period = 10 };
@@ -496,7 +508,6 @@
         [Range(0, 900)]
         public int Offset { get => iOffset; set { iOffset = value; RecalculateValues(); } }
 
-        private ValueDataSeries _kamanine = new("KAMA NINE") { VisualType = VisualMode.Line, Color = DefaultColors.Yellow.Convert(), Width = 5 };
         private RangeDataSeries _upCloud = new("Up Cloud") { RangeColor = MColor.FromArgb(73, 0, 255, 0), DrawAbovePrice = false };
         private RangeDataSeries _dnCloud = new("Down Cloud") { RangeColor = MColor.FromArgb(73, 255, 0, 0), DrawAbovePrice = false };
         private ValueDataSeries _dnTrend = new("Down SuperTrend") { VisualType = VisualMode.Square, Color = DefaultColors.Red.Convert(), Width = 2 };
@@ -511,6 +522,10 @@
 
         private readonly ValueDataSeries _posSeries = new("Regular Buy Signal") { Color = MColor.FromArgb(255, 0, 255, 0), VisualType = VisualMode.Dots, Width = 2 };
         private readonly ValueDataSeries _negSeries = new("Regular Sell Signal") { Color = MColor.FromArgb(255, 255, 104, 48), VisualType = VisualMode.Dots, Width = 2 };
+
+        private readonly ValueDataSeries _lineVWAP = new("VWAP") { Color = MColor.FromArgb(180, 30, 114, 250), VisualType = VisualMode.Line, Width = 4 };
+        private readonly ValueDataSeries _lineEMA200 = new("EMA 200") { Color = MColor.FromArgb(255, 165, 166, 164), VisualType = VisualMode.Line, Width = 4 };
+        private readonly ValueDataSeries _lineKAMA = new("KAMA 9") { Color = MColor.FromArgb(180, 252, 186, 3), VisualType = VisualMode.Line, Width = 3 };
 
         #endregion
 
@@ -658,10 +673,13 @@
             _macd.Calculate(pbar, value);
             _bb.Calculate(pbar, value);
             _rsi.Calculate(pbar, value);
+            Ema200.Calculate(pbar, value);
+
+            var e200 = ((ValueDataSeries)Ema200.DataSeries[0])[pbar];
+            var vwap = ((ValueDataSeries)_VWAP.DataSeries[0])[pbar];
+            var kama9 = ((ValueDataSeries)_kama9.DataSeries[0])[pbar];
 
             var ao = ((ValueDataSeries)_ao.DataSeries[0])[pbar];
-            var kama9 = ((ValueDataSeries)_kama9.DataSeries[0])[pbar];
-            var kama21 = ((ValueDataSeries)_kama9.DataSeries[0])[pbar];
             var m1 = ((ValueDataSeries)_macd.DataSeries[0])[pbar]; // macd
             var m2 = ((ValueDataSeries)_macd.DataSeries[1])[pbar]; // signal
             var m3 = ((ValueDataSeries)_macd.DataSeries[2])[pbar]; // difference
@@ -767,6 +785,13 @@
             }
 
             #region ADVANCED LOGIC
+
+            if (bShowLines)
+            {
+                _lineEMA200[pbar] = e200;
+                _lineKAMA[pbar] = kama9;
+                _lineVWAP[pbar] = vwap;
+            }
 
             if (bShowTripleSupertrend)
             {
