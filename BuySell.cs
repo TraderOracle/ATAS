@@ -1,4 +1,6 @@
-﻿namespace ATAS.Indicators.Technical
+﻿using static System.Runtime.InteropServices.JavaScript.JSType;
+
+namespace ATAS.Indicators.Technical
 {
     using System;
     using System.Collections.ObjectModel;
@@ -14,25 +16,21 @@
     using OFT.Rendering.Context;
     using OFT.Rendering.Tools;
     using static ATAS.Indicators.Technical.SampleProperties;
-
+    
     using Color = System.Drawing.Color;
     using MColor = System.Windows.Media.Color;
     using MColors = System.Windows.Media.Colors;
     using Pen = System.Drawing.Pen;
-    using String = String;
-    using System.Runtime.ConstrainedExecution;
-    using static ATAS.Indicators.Technical.BarTimer;
+    using String = System.String;
     using System.Globalization;
     using OFT.Rendering.Settings;
-    using System.Windows.Ink;
+    using Newtonsoft.Json;
+    using System.Text;
+    using System.Reflection.Metadata;
 
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "1.5";
-        private int iJunk = 0;
-        private bool bBigArrowUp = false;
-
         #region PRIVATE FIELDS
 
         private struct bars
@@ -51,7 +49,9 @@
         private List<bars> lsBar = new List<bars>();
         private List<string> lsH = new List<string>();
         private List<string> lsM = new List<string>();
-
+        private const String sVersion = "1.7";
+        private bool bBigArrowUp = false;
+        private static readonly HttpClient client = new HttpClient();
         private readonly PaintbarsDataSeries _paintBars = new("Paint bars");
 
         private int _lastBar = -1;
@@ -887,14 +887,25 @@
             {
                 if (_lastBarCounted && UseAlerts)
                 {
+                    var priceString = candle.Close.ToString();
+
                     if (bVolumeImbalances)
                         if ((green && c1G && candle.Open > p1C.Close) || (red && c1R && candle.Open < p1C.Close))
+                        {
                             AddAlert(AlertFile, "Volume Imbalance");
+                            Task.Run(() => SendWebhookAndWriteToFile("IMBALANCED a chalupa ", InstrumentInfo.Instrument, priceString));
+                        }
 
                     if (bShowUp && bShowRegularBuySell)
+                    {
                         AddAlert(AlertFile, "BUY Signal");
+                        Task.Run(() => SendWebhookAndWriteToFile("BOUGHT a bean burrito ", InstrumentInfo.Instrument, priceString));
+                    }
                     else if (bShowDown && bShowRegularBuySell)
-                        AddAlert(AlertFile, "BUY Signal");
+                    {
+                        AddAlert(AlertFile, "SELL Signal");
+                        Task.Run(() => SendWebhookAndWriteToFile("SOLD a tostada ", InstrumentInfo.Instrument, priceString));
+                    }
 
                     if ((ppsarBuy && m3 > 0 && candle.Delta > 50 && !bBigArrowUp) || (ppsarSell && m3 < 0 && candle.Delta < 50 && bBigArrowUp) && bShowMACDPSARArrow)
                         AddAlert(AlertFile, "Big Arrow");
@@ -932,6 +943,45 @@
 
             if (!bNewsProcessed && bShowNews)
                 LoadStock(pbar);
+        }
+
+        #region MISC FUNCTIONS
+
+        private async Task SendWebhook(string message, string ticker, string price)
+        {
+            var fullMessage = $"{message} from {ticker} for ${price}";
+            var payload = new { content = fullMessage };
+            var jsonPayload = JsonConvert.SerializeObject(payload);
+            var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+            var token = Environment.GetEnvironmentVariable("Webhook");
+            await client.PostAsync(token, content);
+        }
+        private SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
+
+        private async Task WriteToTextFile(string message, string ticker, string price)
+        {
+            var fullMessage = $"{message} for {ticker} at price {price}";
+
+            await semaphore.WaitAsync();
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(@"C:\temp\output.txt", true))
+                {
+                    await writer.WriteLineAsync(fullMessage);
+                }
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }
+
+        private async Task SendWebhookAndWriteToFile(string message, string ticker, string price)
+        {
+            var sendWebhookTask = SendWebhook(message, ticker, price);
+            var writeToTextFileTask = WriteToTextFile(message, ticker, price);
+
+            await Task.WhenAll(sendWebhookTask, writeToTextFileTask);
         }
 
         private String EvilTimes(int bar)
@@ -995,6 +1045,8 @@
 
             return Color.White;
         }
+
+        #endregion
 
     }
 }
