@@ -16,7 +16,7 @@ namespace ATAS.Indicators.Technical
     using OFT.Rendering.Context;
     using OFT.Rendering.Tools;
     using static ATAS.Indicators.Technical.SampleProperties;
-    
+
     using Color = System.Drawing.Color;
     using MColor = System.Windows.Media.Color;
     using MColors = System.Windows.Media.Colors;
@@ -49,7 +49,7 @@ namespace ATAS.Indicators.Technical
         private List<bars> lsBar = new List<bars>();
         private List<string> lsH = new List<string>();
         private List<string> lsM = new List<string>();
-        private const String sVersion = "1.7";
+        private const String sVersion = "1.8";
         private bool bBigArrowUp = false;
         private static readonly HttpClient client = new HttpClient();
         private readonly PaintbarsDataSeries _paintBars = new("Paint bars");
@@ -225,7 +225,7 @@ namespace ATAS.Indicators.Technical
         [Display(GroupName = "Custom MA Filter", Name = "Custom EMA Period", Description = "Price crosses your own EMA period")]
         [Range(1, 1000)]
         public int Custom_EMA_Period
-        { get => iMyEMAPeriod; set { if (value < 1) return; iMyEMAPeriod = _myEMA.Period = value;RecalculateValues(); }        }
+        { get => iMyEMAPeriod; set { if (value < 1) return; iMyEMAPeriod = _myEMA.Period = value; RecalculateValues(); } }
 
         [Display(GroupName = "Custom MA Filter", Name = "Use KAMA", Description = "Price crosses KAMA")]
         public bool Use_KAMA { get => bUseKAMA; set { bUseKAMA = value; RecalculateValues(); } }
@@ -370,7 +370,7 @@ namespace ATAS.Indicators.Technical
                             Font.Bold = false;
                         }
                     }
-
+/*
                     if (ix.bar == bar)
                     {
                         renderString = ix.s.ToString(CultureInfo.InvariantCulture);
@@ -391,6 +391,7 @@ namespace ATAS.Indicators.Technical
                         }
                         break;
                     }
+*/
                 }
 
 
@@ -463,7 +464,7 @@ namespace ATAS.Indicators.Technical
         {
             var candle = GetCandle(bBar);
             bars ty;
-
+/*
             ty.s = strX;
             ty.bar = bBar;
             if (candle.Close > candle.Open || bOverride)
@@ -479,7 +480,7 @@ namespace ATAS.Indicators.Technical
             lsBar.Add(ty);
 
             return;
-
+*/
             decimal _tick = ChartInfo.PriceChartContainer.Step;
             decimal loc = 0;
 
@@ -575,7 +576,7 @@ namespace ATAS.Indicators.Technical
             try
             {
                 HttpWebRequest myRequest = (HttpWebRequest)WebRequest.Create("https://www.forexfactory.com/calendar?day=today");
-                myRequest.Method = "GET"; 
+                myRequest.Method = "GET";
                 myRequest.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36";
                 WebResponse myResponse = myRequest.GetResponse();
                 StreamReader sr = new StreamReader(myResponse.GetResponseStream(), System.Text.Encoding.UTF8);
@@ -717,7 +718,7 @@ namespace ATAS.Indicators.Technical
             var rsi1 = ((ValueDataSeries)_rsi.DataSeries[0])[pbar - 1];
             var rsi2 = ((ValueDataSeries)_rsi.DataSeries[0])[pbar - 2];
             var hma = ((ValueDataSeries)_hma.DataSeries[0])[pbar];
-            var phma = ((ValueDataSeries)_hma.DataSeries[0])[pbar-1];
+            var phma = ((ValueDataSeries)_hma.DataSeries[0])[pbar - 1];
 
             var hullUp = hma > phma;
             var hullDown = hma < phma;
@@ -730,7 +731,6 @@ namespace ATAS.Indicators.Technical
             var psarSell = (psar > candle.Close);
             var ppsarSell = (ppsar > pcandle.Close);
 
-/*
             var eqHigh = c0R && c1R && c2G && c3G && (p1C.High > bb_top || p2C.High > bb_top) &&
                 candle.Close < p1C.Close &&
                 (p1C.Open == p2C.Close || p1C.Open == p2C.Close + _tick || p1C.Open + _tick == p2C.Close);
@@ -738,7 +738,6 @@ namespace ATAS.Indicators.Technical
             var eqLow = c0G && c1G && c2R && c3R && (p1C.Low < bb_bottom || p2C.Low < bb_bottom) &&
                 candle.Close > p1C.Close &&
                 (p1C.Open == p2C.Close || p1C.Open == p2C.Close + _tick || p1C.Open + _tick == p2C.Close);
-*/
 
             var t1 = ((fast - slow) - (fastM - slowM)) * iWaddaSensitivity;
 
@@ -808,9 +807,11 @@ namespace ATAS.Indicators.Technical
 
             // Squeeze momentum relaxer show
             if (sq1 > 0 && sq1 < psq1 && psq1 > ppsq1 && bShowSqueeze)
-                _squeezie[pbar] = candle.High + _tick * 4;
+                DrawText(pbar, "SQ", Color.White, Color.Blue, false, true);
+            //_squeezie[pbar] = candle.High + _tick * 4;
             if (sq1 < 0 && sq1 > psq1 && psq1 < ppsq1 && bShowSqueeze)
-                _squeezie[pbar] = candle.Low - _tick * 4;
+                DrawText(pbar, "SQ", Color.White, Color.Blue, false, true);
+            //_squeezie[pbar] = candle.Low - _tick * 4;
 
             // 9/21 cross show
             if (nn > twone && prev_nn <= prev_twone && bShow921)
@@ -824,6 +825,11 @@ namespace ATAS.Indicators.Technical
                     if ((candle.Close > p1C.Close && p1C.Close > p2C.Close && p2C.Close > p3C.Close) ||
                     (candle.Close < p1C.Close && p1C.Close < p2C.Close && p2C.Close < p3C.Close))
                         DrawText(pbar, "Stairs", Color.Yellow, Color.Transparent);
+
+                if (eqHigh)
+                    DrawText(pbar - 1, "Equal\nHigh", Color.Lime, Color.Transparent, false, true);
+                if (eqLow)
+                    DrawText(pbar - 1, "Equal\nLow", Color.Yellow, Color.Transparent, false, true);
             }
 
             if (bShowRevPattern)
@@ -868,8 +874,6 @@ namespace ATAS.Indicators.Technical
                     DrawText(pbar, "TR", Color.Yellow, Color.BlueViolet, false, true);
             }
 
-            #endregion
-
             if (ppsarBuy && m3 > 0 && candle.Delta > 50 && !bBigArrowUp && bShowMACDPSARArrow)
             {
                 _posRev[bar] = candle.Low - (_tick * 2);
@@ -880,6 +884,8 @@ namespace ATAS.Indicators.Technical
                 _negRev[bar] = candle.High + (_tick * 2);
                 bBigArrowUp = false;
             }
+
+            #endregion
 
             #region ALERTS LOGIC
 
