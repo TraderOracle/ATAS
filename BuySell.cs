@@ -113,7 +113,7 @@ namespace ATAS.Indicators.Technical
         private int iMinADX = 0;
         private int iMyEMAPeriod = 21;
         private int iKAMAPeriod = 9;
-        private int iOffset = 1;
+        private int iOffset = 9;
         private int iFontSize = 10;
         private int iNewsFont = 10;
         private int iWaddaSensitivity = 120;
@@ -826,13 +826,13 @@ namespace ATAS.Indicators.Technical
             if (upTrades > pdnTrades && upTrades > pupTrades && upTrades > dnTrades &&
                 (candle.Low < bb_bottom || candle.Low < bb_bottom))
             {
-                _posBBounce[pbar] = candle.Low - (_tick * 2);
+                _posBBounce[pbar] = candle.Low - (_tick * iOffset);
                 iDoubleDecker = 1;
             }
             if (dnTrades > pupTrades && dnTrades > pdnTrades && dnTrades > upTrades &&
                 (candle.High > bb_top || candle.High > bb_top))
             {
-                _negBBounce[pbar] = candle.High - (_tick * 2);
+                _negBBounce[pbar] = candle.High + (_tick * iOffset);
                 iDoubleDecker = -1;
             }
 
@@ -841,7 +841,7 @@ namespace ATAS.Indicators.Technical
 
             if (bShowUp && bShowRegularBuySell)
             {
-                _posSeries[pbar] = candle.Low - (_tick * 2);
+                _posSeries[pbar] = candle.Low - (_tick * iOffset);
                 PlaySound(sBuyWav, pbar);
             }
 
@@ -850,7 +850,7 @@ namespace ATAS.Indicators.Technical
 
             if (bShowDown && bShowRegularBuySell)
             {
-                _negSeries[pbar] = candle.High + _tick * 2;
+                _negSeries[pbar] = candle.High + _tick * iOffset;
                 PlaySound(sSellWav, pbar);
             }
 
