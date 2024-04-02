@@ -34,6 +34,8 @@ namespace ATAS.Indicators.Technical
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
+        private const String sVersion = "2.2";
+
         #region PRIVATE FIELDS
 
         private struct bars
@@ -52,7 +54,6 @@ namespace ATAS.Indicators.Technical
         private List<bars> lsBar = new List<bars>();
         private List<string> lsH = new List<string>();
         private List<string> lsM = new List<string>();
-        private const String sVersion = "2.1";
         private bool bBigArrowUp = false;
         private static readonly HttpClient client = new HttpClient();
         private readonly PaintbarsDataSeries _paintBars = new("Paint bars");
@@ -285,6 +286,8 @@ namespace ATAS.Indicators.Technical
             DataSeries.Add(_posWhite);
             DataSeries.Add(_negRev);
             DataSeries.Add(_posRev);
+            DataSeries.Add(_negBBounce);
+            DataSeries.Add(_posBBounce);
             DataSeries.Add(_nine21);
             DataSeries.Add(_squeezie);
             DataSeries.Add(_paintBars);
@@ -559,6 +562,9 @@ namespace ATAS.Indicators.Technical
         private readonly ValueDataSeries _posRev = new("MACD/PSAR Buy Arrow") { Color = MColors.LightGreen, VisualType = VisualMode.UpArrow, Width = 2 };
         private readonly ValueDataSeries _negRev = new("MACD/PSAR Sell Arrow") { Color = MColors.LightPink, VisualType = VisualMode.DownArrow, Width = 2 };
 
+        private readonly ValueDataSeries _posBBounce = new("Bollinger Bounce Up") { Color = MColors.LightGreen, VisualType = VisualMode.Block, Width = 9 };
+        private readonly ValueDataSeries _negBBounce = new("Bollinger Bounce Down") { Color = MColors.LightPink, VisualType = VisualMode.Block, Width = 9 };
+
         private readonly ValueDataSeries _posSeries = new("Regular Buy Signal") { Color = MColor.FromArgb(255, 0, 255, 0), VisualType = VisualMode.Dots, Width = 2 };
         private readonly ValueDataSeries _negSeries = new("Regular Sell Signal") { Color = MColor.FromArgb(255, 255, 104, 48), VisualType = VisualMode.Dots, Width = 2 };
 
@@ -811,6 +817,25 @@ namespace ATAS.Indicators.Technical
 
             #endregion
 
+            var upTrades = candle.Volume * (candle.Close - candle.Low) / (candle.High - candle.Low);
+            var dnTrades = candle.Volume * (candle.High - candle.Close) / (candle.High - candle.Low);
+            var pupTrades = pcandle.Volume * (pcandle.Close - pcandle.Low) / (pcandle.High - pcandle.Low);
+            var pdnTrades = pcandle.Volume * (pcandle.High - pcandle.Close) / (pcandle.High - pcandle.Low);
+            int iDoubleDecker = 0;
+
+            if (upTrades > pdnTrades && upTrades > pupTrades && upTrades > dnTrades &&
+                (candle.Low < bb_bottom || candle.Low < bb_bottom))
+            {
+                _posBBounce[pbar] = candle.Low - (_tick * 2);
+                iDoubleDecker = 1;
+            }
+            if (dnTrades > pupTrades && dnTrades > pdnTrades && dnTrades > upTrades &&
+                (candle.High > bb_top || candle.High > bb_top))
+            {
+                _negBBounce[pbar] = candle.High - (_tick * 2);
+                iDoubleDecker = -1;
+            }
+
             if ((candle.Delta < iMinDelta) || (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama9 && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || x < iMinADX || (bUseHMA && hullDown))
                 bShowUp = false;
 
@@ -984,6 +1009,11 @@ namespace ATAS.Indicators.Technical
                             Task.Run(() => SendWebhookAndWriteToFile("IMBALANCED a chalupa ", InstrumentInfo.Instrument, priceString));
                         }
 
+                    if (iDoubleDecker != 0)
+                    {
+                        AddAlert(AlertFile, "Bollinger Signal");
+                        Task.Run(() => SendWebhookAndWriteToFile("DOUBLE DECKER TACO ALERT ", InstrumentInfo.Instrument, priceString));
+                    }
                     if (bShowUp && bShowRegularBuySell)
                     {
                         AddAlert(AlertFile, "BUY Signal");
