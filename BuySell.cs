@@ -1,5 +1,4 @@
-﻿using static System.Runtime.InteropServices.JavaScript.JSType;
-
+﻿
 namespace ATAS.Indicators.Technical
 {
     using System;
@@ -34,7 +33,7 @@ namespace ATAS.Indicators.Technical
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "2.2";
+        private const String sVersion = "2.3";
 
         #region PRIVATE FIELDS
 
@@ -84,6 +83,7 @@ namespace ATAS.Indicators.Technical
         private bool bShowMACDPSARArrow = true;
         private bool bShowRegularBuySell = true;
         private bool bVolumeImbalances = true;
+        private bool bShowSquare = true;
 
         // Default FALSE
         private bool bShowPNL = false;
@@ -128,11 +128,12 @@ namespace ATAS.Indicators.Technical
 
         #region SETTINGS
 
-
         [Display(GroupName = "Buy/Sell Indicators", Name = "Show buy/sell dots")]
         public bool ShowRegularBuySell { get => bShowRegularBuySell; set { bShowRegularBuySell = value; RecalculateValues(); } }
         [Display(GroupName = "Buy/Sell Indicators", Name = "Show MACD/PSAR arrow")]
         public bool ShowBigArrow { get => bShowMACDPSARArrow; set { bShowMACDPSARArrow = value; RecalculateValues(); } }
+        [Display(GroupName = "Buy/Sell Indicators", Name = "Show reversal square")]
+        public bool ShowSquare{ get => bShowSquare; set { bShowSquare = value; RecalculateValues(); } }
 
         // ========================================================================
         // =======================    FILTER INDICATORS    ========================
@@ -372,7 +373,7 @@ namespace ATAS.Indicators.Technical
                 renderString = bar.ToString(CultureInfo.InvariantCulture);
                 stringSize = context.MeasureString(renderString, Font.RenderObject);
 
-//                foreach (bars ix in lsBar)
+                //                foreach (bars ix in lsBar)
                 {
                     if (bShowEvil)
                     {
@@ -407,28 +408,28 @@ namespace ATAS.Indicators.Technical
                             Font.Bold = false;
                         }
                     }
-/*
-                    if (ix.bar == bar)
-                    {
-                        renderString = ix.s.ToString(CultureInfo.InvariantCulture);
-                        stringSize = context.MeasureString(renderString, Font.RenderObject);
-                        x4 = ChartInfo.GetXByBar(bar, false);
-                        y4 = Offset;
-                        if (ix.top)
-                        {
-                            var high = GetCandle(bar).High;
-                            y4 += ChartInfo.GetYByPrice(high + (InstrumentInfo.TickSize * Offset) * 2, false);
-                            context.DrawString(renderString, Font.RenderObject, Color.Orange, x4, y4, _format);
-                        }
-                        else
-                        {
-                            var low = GetCandle(bar).Low;
-                            y4 += ChartInfo.GetYByPrice(low - InstrumentInfo.TickSize * Offset, false);
-                            context.DrawString(renderString, Font.RenderObject, Color.Lime, x4, y4, _format);
-                        }
-                        break;
-                    }
-*/
+                    /*
+                                        if (ix.bar == bar)
+                                        {
+                                            renderString = ix.s.ToString(CultureInfo.InvariantCulture);
+                                            stringSize = context.MeasureString(renderString, Font.RenderObject);
+                                            x4 = ChartInfo.GetXByBar(bar, false);
+                                            y4 = Offset;
+                                            if (ix.top)
+                                            {
+                                                var high = GetCandle(bar).High;
+                                                y4 += ChartInfo.GetYByPrice(high + (InstrumentInfo.TickSize * Offset) * 2, false);
+                                                context.DrawString(renderString, Font.RenderObject, Color.Orange, x4, y4, _format);
+                                            }
+                                            else
+                                            {
+                                                var low = GetCandle(bar).Low;
+                                                y4 += ChartInfo.GetYByPrice(low - InstrumentInfo.TickSize * Offset, false);
+                                                context.DrawString(renderString, Font.RenderObject, Color.Lime, x4, y4, _format);
+                                            }
+                                            break;
+                                        }
+                    */
                 }
 
                 var font2 = new RenderFont("Arial", iNewsFont);
@@ -500,23 +501,23 @@ namespace ATAS.Indicators.Technical
         {
             var candle = GetCandle(bBar);
             bars ty;
-/*
-            ty.s = strX;
-            ty.bar = bBar;
-            if (candle.Close > candle.Open || bOverride)
-                ty.top = true;
-            else
-                ty.top = false;
+            /*
+                        ty.s = strX;
+                        ty.bar = bBar;
+                        if (candle.Close > candle.Open || bOverride)
+                            ty.top = true;
+                        else
+                            ty.top = false;
 
-            if (candle.Close > candle.Open && bSwap)
-                ty.top = false;
-            else if (candle.Close < candle.Open && bSwap)
-                ty.top = true;
+                        if (candle.Close > candle.Open && bSwap)
+                            ty.top = false;
+                        else if (candle.Close < candle.Open && bSwap)
+                            ty.top = true;
 
-            lsBar.Add(ty);
+                        lsBar.Add(ty);
 
-            return;
-*/
+                        return;
+            */
             decimal _tick = ChartInfo.PriceChartContainer.Step;
             decimal loc = 0;
 
@@ -690,21 +691,6 @@ namespace ATAS.Indicators.Technical
 
             var ThreeOutDown = c2G && c1R && c0R && p1C.Open > p2C.Close && p2C.Open > p1C.Close && Math.Abs(p1C.Open - p1C.Close) > Math.Abs(p2C.Open - p2C.Close) && candle.Close < p1C.Low;
 
-            if (bVolumeImbalances)
-            {
-                var highPen = new Pen(new SolidBrush(Color.RebeccaPurple)) { Width = 2 };
-                if (green && c1G && candle.Open > p1C.Close)
-                {
-                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
-                    _negWhite[pbar] = candle.Low - (_tick * 2);
-                }
-                if (red && c1R && candle.Open < p1C.Close)
-                {
-                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
-                    _posWhite[pbar] = candle.High + (_tick * 2);
-                }
-            }
-
             #endregion
 
             #region INDICATORS CALCULATE
@@ -817,23 +803,41 @@ namespace ATAS.Indicators.Technical
 
             #endregion
 
-            var upTrades = candle.Volume * (candle.Close - candle.Low) / (candle.High - candle.Low);
-            var dnTrades = candle.Volume * (candle.High - candle.Close) / (candle.High - candle.Low);
-            var pupTrades = pcandle.Volume * (pcandle.Close - pcandle.Low) / (pcandle.High - pcandle.Low);
-            var pdnTrades = pcandle.Volume * (pcandle.High - pcandle.Close) / (pcandle.High - pcandle.Low);
-            int iDoubleDecker = 0;
+            #region BUY / SELL
 
-            if (upTrades > pdnTrades && upTrades > pupTrades && upTrades > dnTrades &&
-                (candle.Low < bb_bottom || candle.Low < bb_bottom))
+            if (bVolumeImbalances)
             {
-                _posBBounce[pbar] = candle.Low - (_tick * iOffset);
-                iDoubleDecker = 1;
+                var highPen = new Pen(new SolidBrush(Color.CornflowerBlue)) { Width = 3 };
+                if (green && c1G && candle.Open > p1C.Close)
+                {
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
+                    _negWhite[pbar] = candle.Low - (_tick * 2);
+                }
+                if (red && c1R && candle.Open < p1C.Close)
+                {
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
+                    _posWhite[pbar] = candle.High + (_tick * 2);
+                }
             }
-            if (dnTrades > pupTrades && dnTrades > pdnTrades && dnTrades > upTrades &&
-                (candle.High > bb_top || candle.High > bb_top))
+
+            int iDoubleDecker = 0;
+            if (bShowSquare)
             {
-                _negBBounce[pbar] = candle.High + (_tick * iOffset);
-                iDoubleDecker = -1;
+                var upTrades = candle.Volume * (candle.Close - candle.Low) / (candle.High - candle.Low);
+                var dnTrades = candle.Volume * (candle.High - candle.Close) / (candle.High - candle.Low);
+                var pupTrades = pcandle.Volume * (pcandle.Close - pcandle.Low) / (pcandle.High - pcandle.Low);
+                var pdnTrades = pcandle.Volume * (pcandle.High - pcandle.Close) / (pcandle.High - pcandle.Low);
+
+                if (upTrades > pdnTrades && upTrades > pupTrades && upTrades > dnTrades && candle.Low < bb_bottom)
+                {
+                    _posBBounce[pbar] = candle.Low - (_tick * iOffset * 2);
+                    iDoubleDecker = 1;
+                }
+                if (dnTrades > pupTrades && dnTrades > pdnTrades && dnTrades > upTrades && candle.High > bb_top)
+                {
+                    _negBBounce[pbar] = candle.High + (_tick * iOffset * 2);
+                    iDoubleDecker = -1;
+                }
             }
 
             if ((candle.Delta < iMinDelta) || (!macdUp && bUseMACD) || (psarSell && bUsePSAR) || (!fisherUp && bUseFisher) || (value < t3 && bUseT3) || (value < kama9 && bUseKAMA) || (value < myema && bUseMyEMA) || (t1 < 0 && bUseWaddah) || (ao < 0 && bUseAO) || (stu2 == 0 && bUseSuperTrend) || (sq1 < 0 && bUseSqueeze) || x < iMinADX || (bUseHMA && hullDown))
@@ -872,6 +876,8 @@ namespace ATAS.Indicators.Technical
                 if (canColor == 5)
                     _paintBars[pbar] = m3 > 0 ? MColor.FromArgb(255, 0, (byte)filteredLinda, 0) : MColor.FromArgb(255, (byte)filteredLinda, 0, 0);
             }
+
+            #endregion
 
             #region ADVANCED LOGIC
 
@@ -921,13 +927,13 @@ namespace ATAS.Indicators.Technical
                     DrawText(pbar - 1, "Eq Hi", Color.Lime, Color.Transparent, false, true);
                     PlaySound(sEqHiLowWav, pbar);
                 }
-                    
+
                 if (eqLow)
                 {
                     DrawText(pbar - 1, "Eq Low", Color.Yellow, Color.Transparent, false, true);
                     PlaySound(sEqHiLowWav, pbar);
                 }
-                    
+
             }
 
             if (bShowRevPattern)
@@ -942,13 +948,13 @@ namespace ATAS.Indicators.Technical
                     DrawText(pbar, "Vol\nRev", Color.Yellow, Color.Transparent, false, true);
                     PlaySound(sVolRevWav, pbar);
                 }
-                    
+
                 if (c0R && c1G && c2G && VolSec(p1C) > VolSec(p2C) && VolSec(p2C) > VolSec(p3C) && candle.Delta > 0)
                 {
                     DrawText(pbar, "Vol\nRev", Color.Lime, Color.Transparent, false, true);
                     PlaySound(sVolRevWav, pbar);
                 }
-                    
+
                 if (ThreeOutUp)
                     DrawText(pbar, "3oU", Color.Yellow, Color.Transparent);
                 if (ThreeOutDown && bShowRevPattern)
@@ -1167,16 +1173,16 @@ namespace ATAS.Indicators.Technical
         private void PlaySound(String s, int bar)
         {
             if (bar > CurrentBar - 2)
-            try
-            {
-                string appPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                SoundPlayer player = new SoundPlayer();
-                player.SoundLocation = appPath + "\\sounds\\" + s + ".wav";
-                player.Play();
-            }
-            catch
-            {
-            }
+                try
+                {
+                    string appPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                    SoundPlayer player = new SoundPlayer();
+                    player.SoundLocation = appPath + "\\sounds\\" + s + ".wav";
+                    player.Play();
+                }
+                catch
+                {
+                }
         }
 
         #endregion
