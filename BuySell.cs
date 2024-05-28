@@ -33,9 +33,9 @@ namespace ATAS.Indicators.Technical
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "2.5";
+        private const String sVersion = "2.6";
         private int iTouched = 0;
-        private bool bVolImbFinished = false;
+        private bool bVolImbFinished = false; 
 
         #region PRIVATE FIELDS
 
@@ -1023,7 +1023,7 @@ namespace ATAS.Indicators.Technical
                     if (bVolImbFinished)
                     {
                         AddAlert(AlertFile, "Vol Imbalance Finish");
-                        Task.Run(() => SendWebhookAndWriteToFile("NACHO FRIES ALERT ", InstrumentInfo.Instrument, priceString));
+                        //Task.Run(() => SendWebhookAndWriteToFile("NACHO FRIES ALERT ", InstrumentInfo.Instrument, priceString));
                     }
 
                     if (bVolumeImbalances)
@@ -1036,12 +1036,12 @@ namespace ATAS.Indicators.Technical
                     if (iDoubleDecker != 0)
                     {
                         AddAlert(AlertFile, "Bollinger Signal");
-                        Task.Run(() => SendWebhookAndWriteToFile("DOUBLE DECKER TACO ALERT ", InstrumentInfo.Instrument, priceString));
+                        Task.Run(() => SendWebhookAndWriteToFile("BOLLINGER taco ", InstrumentInfo.Instrument, priceString));
                     }
                     if (bShowUp && bShowRegularBuySell)
                     {
                         AddAlert(AlertFile, "BUY Signal");
-                        Task.Run(() => SendWebhookAndWriteToFile("BOUGHT a bean burrito ", InstrumentInfo.Instrument, priceString));
+                        Task.Run(() => SendWebhookAndWriteToFile("BOUGHT a tostada ", InstrumentInfo.Instrument, priceString));
                     }
                     else if (bShowDown && bShowRegularBuySell)
                     {
