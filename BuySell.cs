@@ -879,7 +879,7 @@ namespace ATAS.Indicators.Technical
             if (iLocalTouch > iTouched)
             {
                 iTouched = iLocalTouch;
-                _paintBars[bar] = MColor.FromRgb(255, 255, 255);
+                // _paintBars[bar] = MColor.FromRgb(255, 255, 255);
                 bVolImbFinished = true;
             }
                 
@@ -1022,8 +1022,8 @@ namespace ATAS.Indicators.Technical
 
                     if (bVolImbFinished)
                     {
-                        AddAlert(AlertFile, "Vol Imbalance Finish");
-                        //Task.Run(() => SendWebhookAndWriteToFile("NACHO FRIES ALERT ", InstrumentInfo.Instrument, priceString));
+                        // AddAlert(AlertFile, "Vol Imbalance Finish");
+                        // Task.Run(() => SendWebhookAndWriteToFile("NACHO FRIES ALERT ", InstrumentInfo.Instrument, priceString));
                     }
 
                     if (bVolumeImbalances)
@@ -1076,9 +1076,9 @@ namespace ATAS.Indicators.Technical
                 var vL = Math.Abs(candle.ValueArea.ValueAreaLow - candle.Low);
 
                 if ((vH * iClusterRatio) < vL && m3 > 0 && green && cPL.Bid < iMinBid && cPL.Ask < iMinAsk)
-                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, gPen, 2));
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, gPen, 1));
                 else if ((vL * iClusterRatio) < vH && m3 < 0 && red && cPH.Bid < iMinBid && cPH.Ask < iMinAsk)
-                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, rPen, 2));
+                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, rPen, 1));
             }
 
             #endregion
