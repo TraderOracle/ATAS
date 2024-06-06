@@ -39,7 +39,7 @@ namespace ATAS.Indicators.Technical
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "2.8";
+        private const String sVersion = "2.9";
         private int iTouched = 0;
         private bool bVolImbFinished = false; 
 
@@ -731,9 +731,7 @@ namespace ATAS.Indicators.Technical
             if (candleSeconds is 0)
                 candleSeconds = 1;
             var volPerSecond = candle.Volume / candleSeconds;
-
             var deltaPer = candle.Delta > 0 ? (candle.Delta / candle.MaxDelta) : (candle.Delta / candle.MinDelta);
-
             var deltaIntense = Math.Abs((candle.Delta * deltaPer) * volPerSecond);
             var deltaShaved = candle.Delta * deltaPer;
 
@@ -826,6 +824,8 @@ namespace ATAS.Indicators.Technical
             var signal = _Ssignal.Calculate(pbar, macd);
             m3 = macd - signal;
 
+            #endregion
+
             var bDoji = false;
             var bpDoji = false;
 
@@ -867,8 +867,6 @@ namespace ATAS.Indicators.Technical
                 iFutureSound = 9;
                 _paintBars[pbar] = MColor.FromRgb(255, 255, 255);
             }
-
-            #endregion
 
             if (bShowWaddahLine)
             {
@@ -1007,8 +1005,8 @@ namespace ATAS.Indicators.Technical
 
             if (bShowEngBB)
             {
-                var gPen = new Pen(new SolidBrush(Color.FromArgb(10, 0, 255, 0))) { Width = 3 };
-                var rPen = new Pen(new SolidBrush(Color.FromArgb(10, 255, 0, 0))) { Width = 3 };
+                var gPen = new Pen(new SolidBrush(Color.Transparent)) { Width = 3 };
+                var rPen = new Pen(new SolidBrush(Color.Transparent)) { Width = 3 };
 
                 if ((candle.Low < bb_bottom || p1C.Low < bb_bottom || p2C.Low < bb_bottom) && c0Body > c1Body && c0G && c1R && candle.Close > p1C.Open)
                     Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, gPen, 
