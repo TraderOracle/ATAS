@@ -33,6 +33,7 @@ namespace ATAS.Indicators.Technical
     using System.Media;
     using static System.Net.Mime.MediaTypeNames;
     using OFT.Core.Models;
+    using static System.Reflection.Metadata.BlobBuilder;
 
     #endregion
 
@@ -41,9 +42,16 @@ namespace ATAS.Indicators.Technical
     {
         private const String sVersion = "2.9";
         private int iTouched = 0;
-        private bool bVolImbFinished = false; 
+        private bool bVolImbFinished = false;
 
         #region PRIVATE FIELDS
+
+        private PenSettings defibPen = new PenSettings
+        {
+            Color = DefaultColors.Red.Convert(),
+            Width = 1,
+            LineDashStyle = LineDashStyle.Dot
+        };
 
         private struct bars
         {
@@ -65,6 +73,12 @@ namespace ATAS.Indicators.Technical
         private static readonly HttpClient client = new HttpClient();
         private readonly PaintbarsDataSeries _paintBars = new("Paint bars");
 
+        private String _highS = "Session Open High";
+        private String _lowS = "Session Open Low";
+        private int _highBar;
+        private int _lowBar;
+        private decimal _highest = 0;
+        private decimal _lowest = 0;
         private int _lastBar = -1;
         private int iBigTrades = 25000;
         private int iShavedRatio = 1;
@@ -380,10 +394,28 @@ namespace ATAS.Indicators.Technical
 
         #region RENDER CONTEXT
 
+        private void DrawString(RenderContext context, string renderText, int yPrice, Color color)
+        {
+            var textSize = context.MeasureString(renderText, new RenderFont("Arial", 9));
+            context.DrawString(renderText, new RenderFont("Arial", 9), color, 
+                Container.Region.Right - textSize.Width - 5, yPrice - textSize.Height);
+        }
+
         protected override void OnRender(RenderContext context, DrawingLayouts layout)
         {
             if (ChartInfo is null || InstrumentInfo is null)
                 return;
+
+            var xH = ChartInfo.PriceChartContainer.GetXByBar(_highBar, false);
+            var yH = ChartInfo.PriceChartContainer.GetYByPrice(_highest, false);
+            context.DrawLine(defibPen.RenderObject, xH, yH, Container.Region.Right, yH);
+            DrawString(context, _highS, yH, defibPen.RenderObject.Color);
+
+            var xL = ChartInfo.PriceChartContainer.GetXByBar(_lowBar, false);
+            var yL = ChartInfo.PriceChartContainer.GetYByPrice(_lowest, false);
+            context.DrawLine(defibPen.RenderObject, xL, yL, Container.Region.Right, yL);
+            DrawString(context, _lowS, yL, defibPen.RenderObject.Color);
+
             if (!bShowPNL && !bShowEvil && !bShowNews && !bShowStar && !bAdvanced && !bShowRevPattern)
                 return;
 
@@ -600,6 +632,38 @@ namespace ATAS.Indicators.Technical
 
         #endregion
 
+        private void MarkOpenSession(int bar)
+        {
+            var candle = GetCandle(bar);
+            var diff = InstrumentInfo.TimeZone;
+            var time = candle.Time.AddHours(diff);
+            var today = DateTime.Today.Year.ToString() + "-" + DateTime.Today.Month.ToString() + "-" + DateTime.Today.Day.ToString();
+
+            today = "2024-06-06";
+
+            if (time > DateTime.Parse(today + " 08:20AM") && time < DateTime.Parse(today + " 08:29AM"))
+            {
+                _highest = candle.High;
+                _highBar = bar;
+                _lowest = candle.Low;
+                _lowBar = bar;
+            }
+
+            if (time > DateTime.Parse(today + " 08:30AM") && time < DateTime.Parse(today + " 09:30AM"))
+            {
+                if (candle.High > _highest)
+                {
+                    _highest = candle.High;
+                    _highBar = bar;
+                }
+                if (candle.Low < _lowest)
+                {
+                    _lowest = candle.Low;
+                    _lowBar = bar;
+                }
+            }
+        }
+
         #region Stock HTTP Fetch
 
         private void ParseStockEvents(String result, int bar)
@@ -680,6 +744,8 @@ namespace ATAS.Indicators.Technical
             if (bar < 6)
                 return;
 
+            MarkOpenSession(bar);
+
             #region CANDLE CALCULATIONS
 
             iFutureSound = 0;
@@ -689,6 +755,12 @@ namespace ATAS.Indicators.Technical
             var ppbar = bar - 2;
             value = candle.Close;
             var chT = ChartInfo.ChartType;
+
+            if (IsNewSession(bar))
+            {
+                _highest = candle.High;
+                _lowest = candle.Low;
+            }
 
             bShowDown = true;
             bShowUp = true;
@@ -898,13 +970,13 @@ namespace ATAS.Indicators.Technical
                 {
                     HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
                     _negWhite[pbar] = candle.Low - (_tick * 2);
-                    iFutureSound = 2;
+                    iFutureSound = 12;
                 }
                 if (red && c1R && candle.Open < p1C.Close)
                 {
                     HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
                     _posWhite[pbar] = candle.High + (_tick * 2);
-                    iFutureSound = 2;
+                    iFutureSound = 12;
                 }
             }
 
@@ -934,7 +1006,7 @@ namespace ATAS.Indicators.Technical
             if (bShowUp && bShowRegularBuySell)
             {
                 _posSeries[pbar] = candle.Low - (_tick * iOffset);
-                iFutureSound = 3;
+                iFutureSound = 10;
             }
 
             if ((candle.Delta > (iMinDelta * -1)) || (psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) || (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (value > myema && bUseMyEMA) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || x < iMinADX || (bUseHMA && hullUp))
@@ -943,7 +1015,7 @@ namespace ATAS.Indicators.Technical
             if (bShowDown && bShowRegularBuySell)
             {
                 _negSeries[pbar] = candle.High + _tick * iOffset;
-                iFutureSound = 4;
+                iFutureSound = 11;
             }
 
             if (canColor > 1)
@@ -989,6 +1061,7 @@ namespace ATAS.Indicators.Technical
             
             if (bShowDojiCity && bDoji && bpDoji)
             {
+                iFutureSound = 13;
                 var highPen = new Pen(new SolidBrush(Color.Transparent)) { Width = 2 };
                 //_paintBars[pbar] = MColor.FromRgb(255, 255, 255);
                 Rectangles.Add(new DrawingRectangle(ppbar, p1C.Low - 499, pbar, p1C.High + 499, highPen, 
@@ -1060,10 +1133,10 @@ namespace ATAS.Indicators.Technical
                 if (c4Body > c3Body && c3Body > c2Body && c2Body > c1Body && c1Body > c0Body)
                     if ((candle.Close > p1C.Close && p1C.Close > p2C.Close && p2C.Close > p3C.Close) ||
                     (candle.Close < p1C.Close && p1C.Close < p2C.Close && p2C.Close < p3C.Close))
-                    {
+                {
                         DrawText(pbar, "Stairs", Color.Yellow, Color.Transparent);
                         iFutureSound = 4;
-                    }
+                }
 
                 if (eqHigh)
                 {
@@ -1076,7 +1149,6 @@ namespace ATAS.Indicators.Technical
                     DrawText(pbar - 1, "Eq Low", Color.Yellow, Color.Transparent, false, true);
                     iFutureSound = 7;
                 }
-
             }
 
             if (bShowRevPattern)
@@ -1160,65 +1232,90 @@ namespace ATAS.Indicators.Technical
                     {
                         case 1:
                             play("majorline");
+                            Task.Run(() => SendWebhookAndWriteToFile("MAJOR LINE WICKED taco ", InstrumentInfo.Instrument, priceString));
                             break;
                         case 2:
                             play("VolRev");
+                            Task.Run(() => SendWebhookAndWriteToFile("VOLUME REVERSED taco ", InstrumentInfo.Instrument, priceString));
                             break;
                         case 3:
                             play("intensity");
+                            Task.Run(() => SendWebhookAndWriteToFile("INTENSITY taco ", InstrumentInfo.Instrument, priceString));
                             break;
                         case 4:
                             play("stairs");
+                            Task.Run(() => SendWebhookAndWriteToFile("STAIRS taco ", InstrumentInfo.Instrument, priceString));
                             break;
                         case 5:
                             play("squeezie");
+                            Task.Run(() => SendWebhookAndWriteToFile("SQUEEZED taco ", InstrumentInfo.Instrument, priceString));
                             break;
                         case 6:
                             play("equal high");
+                            Task.Run(() => SendWebhookAndWriteToFile("EQUAL HIGH taco ", InstrumentInfo.Instrument, priceString));
                             break;
                         case 7:
                             play("equal low");
+                            Task.Run(() => SendWebhookAndWriteToFile("EQUAL LOW taco ", InstrumentInfo.Instrument, priceString));
                             break;
                         case 8:
                             play("trampoline");
+                            Task.Run(() => SendWebhookAndWriteToFile("TRAMPOLINE taco ", InstrumentInfo.Instrument, priceString));
                             break;
                         case 9:
                             play("kama");
+                            Task.Run(() => SendWebhookAndWriteToFile("KAMA BOUNCE taco ", InstrumentInfo.Instrument, priceString));
+                            break;
+                        case 10:
+                            play("buy");
+                            Task.Run(() => SendWebhookAndWriteToFile("BOUGHT taco ", InstrumentInfo.Instrument, priceString));
+                            break;
+                        case 11:
+                            play("sell");
+                            Task.Run(() => SendWebhookAndWriteToFile("SOLD taco ", InstrumentInfo.Instrument, priceString));
+                            break;
+                        case 12:
+                            play("volimb");
+                            Task.Run(() => SendWebhookAndWriteToFile("IMBALANCED a chalupa ", InstrumentInfo.Instrument, priceString));
+                            break;
+                        case 13:
+                            play("dojicity");
+                            Task.Run(() => SendWebhookAndWriteToFile("DOJI CITY a chalupa ", InstrumentInfo.Instrument, priceString));
                             break;
                         default: break;
                     }
 
-                    if (bVolImbFinished)
-                    {
-                        // AddAlert(AlertFile, "Vol Imbalance Finish");
-                        // Task.Run(() => SendWebhookAndWriteToFile("NACHO FRIES ALERT ", InstrumentInfo.Instrument, priceString));
-                    }
+                    //if (bVolImbFinished)
+                    //{
+                    //    AddAlert(AlertFile, "Vol Imbalance Finish");
+                    //    Task.Run(() => SendWebhookAndWriteToFile("NACHO FRIES ALERT ", InstrumentInfo.Instrument, priceString));
+                    //}
 
-                    if (bVolumeImbalances)
-                        if ((green && c1G && candle.Open > p1C.Close) || (red && c1R && candle.Open < p1C.Close))
-                        {
-                            //AddAlert(AlertFile, "Volume Imbalance");
-                            Task.Run(() => SendWebhookAndWriteToFile("IMBALANCED a chalupa ", InstrumentInfo.Instrument, priceString));
-                            play("volimb");
-                        }
+                    //if (bVolumeImbalances)
+                    //    if ((green && c1G && candle.Open > p1C.Close) || (red && c1R && candle.Open < p1C.Close))
+                    //    {
+                    //        //AddAlert(AlertFile, "Volume Imbalance");
+                    //        Task.Run(() => SendWebhookAndWriteToFile("IMBALANCED a chalupa ", InstrumentInfo.Instrument, priceString));
+                    //        play("volimb");
+                    //    }
 
-                    if (iDoubleDecker != 0)
-                    {
-                        //AddAlert(AlertFile, "Bollinger Signal");
-                        Task.Run(() => SendWebhookAndWriteToFile("BOLLINGER taco ", InstrumentInfo.Instrument, priceString));
-                    }
-                    if (bShowUp && bShowRegularBuySell)
-                    {
-                        //AddAlert(AlertFile, "BUY Signal");
-                        Task.Run(() => SendWebhookAndWriteToFile("BOUGHT a tostada ", InstrumentInfo.Instrument, priceString));
-                        play("buy");
-                    }
-                    else if (bShowDown && bShowRegularBuySell)
-                    {
-                        //AddAlert(AlertFile, "SELL Signal");
-                        Task.Run(() => SendWebhookAndWriteToFile("SOLD a tostada ", InstrumentInfo.Instrument, priceString));
-                        play("sell");
-                    }
+                    //if (iDoubleDecker != 0)
+                    //{
+                    //    //AddAlert(AlertFile, "Bollinger Signal");
+                    //    Task.Run(() => SendWebhookAndWriteToFile("BOLLINGER taco ", InstrumentInfo.Instrument, priceString));
+                    //}
+                    //if (bShowUp && bShowRegularBuySell)
+                    //{
+                    //    //AddAlert(AlertFile, "BUY Signal");
+                    //    Task.Run(() => SendWebhookAndWriteToFile("BOUGHT a tostada ", InstrumentInfo.Instrument, priceString));
+                    //    play("buy");
+                    //}
+                    //else if (bShowDown && bShowRegularBuySell)
+                    //{
+                    //    //AddAlert(AlertFile, "SELL Signal");
+                    //    Task.Run(() => SendWebhookAndWriteToFile("SOLD a tostada ", InstrumentInfo.Instrument, priceString));
+                    //    play("sell");
+                    //}
 
                    // if ((ppsarBuy && m3 > 0 && candle.Delta > 50 && !bBigArrowUp) || (ppsarSell && m3 < 0 && candle.Delta < 50 && bBigArrowUp) && bShowMACDPSARArrow)
                         //AddAlert(AlertFile, "Big Arrow");
