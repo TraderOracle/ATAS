@@ -12,7 +12,6 @@ namespace ATAS.Indicators.Technical
     using System.Net; 
     using ATAS.Indicators;
     using ATAS.Indicators.Drawing;
-    using ATAS.Indicators.Technical.Properties;
     using OFT.Attributes.Editors;
     using Newtonsoft.Json.Linq;
     using OFT.Rendering.Context;
@@ -28,21 +27,17 @@ namespace ATAS.Indicators.Technical
     using OFT.Rendering.Settings;
     using Newtonsoft.Json;
     using System.Text;
-    using System.Reflection.Metadata;
-    using Utils.Common.SystemInformation;
-    using System.Media;
-    using static System.Net.Mime.MediaTypeNames;
-    using OFT.Core.Models;
-    using static System.Reflection.Metadata.BlobBuilder;
+    using Utils.Common;
 
     #endregion
 
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "2.9";
+        private const String sVersion = "3.1";
         private int iTouched = 0;
         private bool bVolImbFinished = false;
+        private bool bIgnoreBadWicks = true;
 
         #region PRIVATE FIELDS
 
@@ -73,12 +68,19 @@ namespace ATAS.Indicators.Technical
         private static readonly HttpClient client = new HttpClient();
         private readonly PaintbarsDataSeries _paintBars = new("Paint bars");
 
-        private String _highS = "Session Open High";
-        private String _lowS = "Session Open Low";
+        private String _highS = "1st Hour High";
+        private String _lowS = "1st Hour Low";
+        private String _highL = "London High";
+        private String _lowL = "London Low";
+        private String sWavDir = @"C:\Program Files (x86)\ATAS Platform\Sounds";
         private int _highBar;
         private int _lowBar;
         private decimal _highest = 0;
         private decimal _lowest = 0;
+        private int _highBarL;
+        private int _lowBarL;
+        private decimal _highestL = 0;
+        private decimal _lowestL = 0;
         private int _lastBar = -1;
         private int iBigTrades = 25000;
         private int iShavedRatio = 1;
@@ -92,7 +94,8 @@ namespace ATAS.Indicators.Technical
         private String lastEvil = "";
         private bool bShowUp = true;
         private bool bShowDown = true;
-        private bool bWadGreen = false;
+        private bool bShowFirstHour = false;
+        private bool bShowLondon = false;
 
         // Default TRUE
         private bool bShowEngBB = true;
@@ -109,7 +112,6 @@ namespace ATAS.Indicators.Technical
         private bool bShowShaved = true;
 
         private bool bKAMAWick = true;
-        private bool bShowPNL = false;
         private bool bNewsProcessed = false;     // USE
         private bool bUseSuperTrend = false;
         private bool bUseSqueeze = false;
@@ -184,6 +186,10 @@ namespace ATAS.Indicators.Technical
         public bool Use_T3 { get => bUseT3; set { bUseT3 = value; RecalculateValues(); } }
         [Display(GroupName = "Buy/Sell Filters", Name = "Fisher Transform", Description = "Fisher Transform must cross to the correct direction")]
         public bool Use_Fisher_Transform { get => bUseFisher; set { bUseFisher = value; RecalculateValues(); } }
+
+        [Display(GroupName = "Buy/Sell Filters", Name = "Ignore bad candlesticks", Description = "If candlestick pattern doesn't fit the trade signal, don't show")]
+        public bool IgnoreBadWicks { get => bIgnoreBadWicks; set { bIgnoreBadWicks = value; RecalculateValues(); } }
+
         [Display(GroupName = "Buy/Sell Filters", Name = "Minimum ADX", Description = "Minimum ADX value before showing buy/sell")]
         [Range(0, 100)]
         public int Min_ADX { get => iMinADX; set { if (value < 0) return; iMinADX = value; RecalculateValues(); } }
@@ -266,13 +272,11 @@ namespace ATAS.Indicators.Technical
         [Display(GroupName = "Extras", Name = "Show doji cities")]
         public bool ShowDojiCity { get => bShowDojiCity; set { bShowDojiCity = value; RecalculateValues(); } }
 
-
         [Display(GroupName = "Extras", Name = "Show kama wicks")]
         public bool KAMAWick { get => bKAMAWick; set { bKAMAWick = value; RecalculateValues(); } }
 
-        //[Display(GroupName = "Extras", Name = "Show doji cities")]
-        //public bool ShowDojiCity { get => bShowDojiCity; set { bShowDojiCity = value; RecalculateValues(); } }
-
+        [Display(GroupName = "Extras", Name = "WAV Sound Directory")]
+        public String WavDir { get => sWavDir; set { sWavDir = value; RecalculateValues(); } }
 
         [Display(GroupName = "Extras", Name = "Show Kama/EMA 200/VWAP lines")]
         public bool ShowLines { get => bShowLines; set { bShowLines = value; RecalculateValues(); } }
@@ -295,14 +299,20 @@ namespace ATAS.Indicators.Technical
         public bool Use_Tramp { get => bShowTramp; set { bShowTramp = value; RecalculateValues(); } }
 
         [Display(GroupName = "Extras", Name = "Show Evil Times", Description = "Market timing from FighterOfEvil, on Discord")]
-        public bool ShowEvil { get => bShowEvil; set { bShowEvil = value; RecalculateValues(); } }
+        public bool ShowEvil { get => bShowEvil; set { bShowEvil = value; RecalculateValues(); } } 
+
         [Display(GroupName = "Extras", Name = "Show Star Times", Description = "Market timing from Star, on Discord")]
         public bool ShowStar { get => bShowStar; set { bShowStar = value; RecalculateValues(); } }
 
+        [Display(GroupName = "Extras", Name = "Show First Hour Lines", Description = "Show lines from first hour of NY Session")]
+        public bool ShowFirstHour { get => bShowFirstHour; set { bShowFirstHour = value; RecalculateValues(); } }
+
+        [Display(GroupName = "Extras", Name = "Show London Session Lines", Description = "Show lines from London session")]
+        public bool ShowLondon { get => bShowLondon; set { bShowLondon = value; RecalculateValues(); } }
+
         [Display(GroupName = "High Impact News", Name = "Show today's news")]
         public bool Show_News { get => bShowNews; set { bShowNews = value; RecalculateValues(); } }
-        [Display(GroupName = "High Impact News", Name = "Show PNL on screen")]
-        public bool Show_PNL { get => bShowPNL; set { bShowPNL = value; RecalculateValues(); } }
+
         [Display(GroupName = "High Impact News", Name = "News font")]
         [Range(1, 900)]
         public int NewsFont
@@ -355,6 +365,7 @@ namespace ATAS.Indicators.Technical
             Add(_kama21);
             Add(_atr);
             Add(_hma);
+            Add(SI);
         }
 
         #endregion
@@ -368,6 +379,7 @@ namespace ATAS.Indicators.Technical
         private readonly SMA _Slong = new SMA() { Period = 10 };
         private readonly SMA _Ssignal = new SMA() { Period = 16 };
 
+        private readonly StackedImbalance SI = new StackedImbalance();
         private readonly RSI _rsi = new() { Period = 14 };
         private readonly ATR _atr = new() { Period = 14 };
         private readonly AwesomeOscillator _ao = new AwesomeOscillator();
@@ -386,7 +398,6 @@ namespace ATAS.Indicators.Technical
         private readonly BollingerBands _bb = new BollingerBands() { Period = 20, Shift = 0, Width = 2 };
         private readonly KAMA _kama9 = new KAMA() { ShortPeriod = 2, LongPeriod = 109, EfficiencyRatioPeriod = 9 };
         private readonly KAMA _kama21 = new KAMA() { ShortPeriod = 2, LongPeriod = 109, EfficiencyRatioPeriod = 21 };
-        private readonly MACD _macd = new MACD() { ShortPeriod = 3, LongPeriod = 10, SignalPeriod = 16 };
         private readonly T3 _t3 = new T3() { Period = 10, Multiplier = 1 };
         private readonly SqueezeMomentum _sq = new SqueezeMomentum() { BBPeriod = 20, BBMultFactor = 2, KCPeriod = 20, KCMultFactor = 1.5m, UseTrueRange = false };
 
@@ -406,17 +417,34 @@ namespace ATAS.Indicators.Technical
             if (ChartInfo is null || InstrumentInfo is null)
                 return;
 
-            var xH = ChartInfo.PriceChartContainer.GetXByBar(_highBar, false);
-            var yH = ChartInfo.PriceChartContainer.GetYByPrice(_highest, false);
-            context.DrawLine(defibPen.RenderObject, xH, yH, Container.Region.Right, yH);
-            DrawString(context, _highS, yH, defibPen.RenderObject.Color);
+            if (bShowFirstHour)
+            {
+                var xH = ChartInfo.PriceChartContainer.GetXByBar(_highBar, false);
+                var yH = ChartInfo.PriceChartContainer.GetYByPrice(_highest, false);
+                context.DrawLine(defibPen.RenderObject, xH, yH, Container.Region.Right, yH);
+                DrawString(context, _highS, yH, defibPen.RenderObject.Color);
 
-            var xL = ChartInfo.PriceChartContainer.GetXByBar(_lowBar, false);
-            var yL = ChartInfo.PriceChartContainer.GetYByPrice(_lowest, false);
-            context.DrawLine(defibPen.RenderObject, xL, yL, Container.Region.Right, yL);
-            DrawString(context, _lowS, yL, defibPen.RenderObject.Color);
+                var xL = ChartInfo.PriceChartContainer.GetXByBar(_lowBar, false);
+                var yL = ChartInfo.PriceChartContainer.GetYByPrice(_lowest, false);
+                context.DrawLine(defibPen.RenderObject, xL, yL, Container.Region.Right, yL);
+                DrawString(context, _lowS, yL, defibPen.RenderObject.Color);
+            }
 
-            if (!bShowPNL && !bShowEvil && !bShowNews && !bShowStar && !bAdvanced && !bShowRevPattern)
+            if (bShowLondon)
+            {
+                defibPen.Color = DefaultColors.Lime.Convert();
+                var xH = ChartInfo.PriceChartContainer.GetXByBar(_highBarL, false);
+                var yH = ChartInfo.PriceChartContainer.GetYByPrice(_highestL, false);
+                context.DrawLine(defibPen.RenderObject, xH, yH, Container.Region.Right, yH);
+                DrawString(context, _highL, yH, defibPen.RenderObject.Color);
+
+                var xL = ChartInfo.PriceChartContainer.GetXByBar(_lowBarL, false);
+                var yL = ChartInfo.PriceChartContainer.GetYByPrice(_lowestL, false);
+                context.DrawLine(defibPen.RenderObject, xL, yL, Container.Region.Right, yL);
+                DrawString(context, _lowL, yL, defibPen.RenderObject.Color);
+            }
+
+            if (!bShowEvil && !bShowNews && !bShowStar && !bAdvanced && !bShowRevPattern)
                 return;
 
             FontSetting Font = new("Arial", iFontSize);
@@ -465,28 +493,6 @@ namespace ATAS.Indicators.Technical
                             Font.Bold = false;
                         }
                     }
-                    /*
-                                        if (ix.bar == bar)
-                                        {
-                                            renderString = ix.s.ToString(CultureInfo.InvariantCulture);
-                                            stringSize = context.MeasureString(renderString, Font.RenderObject);
-                                            x4 = ChartInfo.GetXByBar(bar, false);
-                                            y4 = Offset;
-                                            if (ix.top)
-                                            {
-                                                var high = GetCandle(bar).High;
-                                                y4 += ChartInfo.GetYByPrice(high + (InstrumentInfo.TickSize * Offset) * 2, false);
-                                                context.DrawString(renderString, Font.RenderObject, Color.Orange, x4, y4, _format);
-                                            }
-                                            else
-                                            {
-                                                var low = GetCandle(bar).Low;
-                                                y4 += ChartInfo.GetYByPrice(low - InstrumentInfo.TickSize * Offset, false);
-                                                context.DrawString(renderString, Font.RenderObject, Color.Lime, x4, y4, _format);
-                                            }
-                                            break;
-                                        }
-                    */
                 }
 
                 var font2 = new RenderFont("Arial", iNewsFont);
@@ -494,35 +500,6 @@ namespace ATAS.Indicators.Technical
                 int upY = 50;
                 int upX = ChartArea.Width - 250;
                 int iTrades = 0;
-
-                if (bShowPNL)
-                    if (TradingManager.Portfolio != null)
-                    {
-                        var txt1 = $"Account: {TradingManager.Portfolio.AccountID}";
-                        context.DrawString(txt1, font2, Color.Gray, upX, upY);
-                        var tsize = context.MeasureString(txt1, font2);
-
-                        upY += tsize.Height + 6;
-                        if (TradingManager.Position != null)
-                        {
-                            tsize = context.MeasureString(txt1, fontB);
-                            txt1 = $"Total PNL: {TradingManager.Position.RealizedPnL}";
-                            if (TradingManager.Position.RealizedPnL > 0)
-                                context.DrawString(txt1, fontB, Color.Lime, upX, upY);
-                            else
-                                context.DrawString(txt1, fontB, Color.Red, upX, upY);
-                        }
-                        upY += tsize.Height + 6;
-                        var myTrades = TradingManager.MyTrades;
-                        if (myTrades.Any())
-                        {
-                            foreach (var myTrade in myTrades)
-                                iTrades++;
-                            tsize = context.MeasureString(txt1, font2);
-                            txt1 = $"Total Trades: " + iTrades;
-                            context.DrawString(txt1, font2, Color.Gray, upX, upY);
-                        }
-                    }
 
                 if (bShowNews)
                 {
@@ -558,23 +535,7 @@ namespace ATAS.Indicators.Technical
         {
             var candle = GetCandle(bBar);
             bars ty;
-            /*
-                        ty.s = strX;
-                        ty.bar = bBar;
-                        if (candle.Close > candle.Open || bOverride)
-                            ty.top = true;
-                        else
-                            ty.top = false;
 
-                        if (candle.Close > candle.Open && bSwap)
-                            ty.top = false;
-                        else if (candle.Close < candle.Open && bSwap)
-                            ty.top = true;
-
-                        lsBar.Add(ty);
-
-                        return;
-            */
             decimal _tick = ChartInfo.PriceChartContainer.Step;
             decimal loc = 0;
 
@@ -631,38 +592,6 @@ namespace ATAS.Indicators.Technical
         private readonly ValueDataSeries _lineKAMA = new("KAMA 9") { Color = MColor.FromArgb(180, 252, 186, 3), VisualType = VisualMode.Line, Width = 3 };
 
         #endregion
-
-        private void MarkOpenSession(int bar)
-        {
-            var candle = GetCandle(bar);
-            var diff = InstrumentInfo.TimeZone;
-            var time = candle.Time.AddHours(diff);
-            var today = DateTime.Today.Year.ToString() + "-" + DateTime.Today.Month.ToString() + "-" + DateTime.Today.Day.ToString();
-
-            today = "2024-06-06";
-
-            if (time > DateTime.Parse(today + " 08:20AM") && time < DateTime.Parse(today + " 08:29AM"))
-            {
-                _highest = candle.High;
-                _highBar = bar;
-                _lowest = candle.Low;
-                _lowBar = bar;
-            }
-
-            if (time > DateTime.Parse(today + " 08:30AM") && time < DateTime.Parse(today + " 09:30AM"))
-            {
-                if (candle.High > _highest)
-                {
-                    _highest = candle.High;
-                    _highBar = bar;
-                }
-                if (candle.Low < _lowest)
-                {
-                    _lowest = candle.Low;
-                    _lowBar = bar;
-                }
-            }
-        }
 
         #region Stock HTTP Fetch
 
@@ -725,8 +654,12 @@ namespace ATAS.Indicators.Technical
 
         private void play(String s)
         {
-            SoundPlayer my_wave_file = new SoundPlayer("c:/SierraAlerts/" + s + ".wav");
-            my_wave_file.PlaySync();
+            try
+            {
+                SoundPlayer my_wave_file = new SoundPlayer(sWavDir + @"\" + s + ".wav");
+                my_wave_file.PlaySync();
+            }
+            catch (Exception)            {            }
         }
 
         #endregion
@@ -760,6 +693,8 @@ namespace ATAS.Indicators.Technical
             {
                 _highest = candle.High;
                 _lowest = candle.Low;
+                _highestL = candle.High;
+                _lowestL = candle.Low;
             }
 
             bShowDown = true;
@@ -799,13 +734,21 @@ namespace ATAS.Indicators.Technical
 
             var ThreeOutDown = c2G && c1R && c0R && p1C.Open > p2C.Close && p2C.Open > p1C.Close && Math.Abs(p1C.Open - p1C.Close) > Math.Abs(p2C.Open - p2C.Close) && candle.Close < p1C.Low;
 
-            var candleSeconds = Convert.ToDecimal((candle.LastTime - candle.Time).TotalSeconds);
-            if (candleSeconds is 0)
-                candleSeconds = 1;
-            var volPerSecond = candle.Volume / candleSeconds;
-            var deltaPer = candle.Delta > 0 ? (candle.Delta / candle.MaxDelta) : (candle.Delta / candle.MinDelta);
-            var deltaIntense = Math.Abs((candle.Delta * deltaPer) * volPerSecond);
-            var deltaShaved = candle.Delta * deltaPer;
+            decimal deltaIntense = 0;
+            if (!candle.MaxDelta.Equals(null) && !candle.MinDelta.Equals(null) && !candle.Delta.Equals(null))
+            {
+                var candleSeconds = Convert.ToDecimal((candle.LastTime - candle.Time).TotalSeconds);
+                if (candleSeconds is 0)
+                    candleSeconds = 1;
+                var volPerSecond = candle.Volume / candleSeconds;
+                var deltaPer = candle.Delta > 0 ? (candle.Delta / candle.MaxDelta) : (candle.Delta / candle.MinDelta);
+                deltaIntense = Math.Abs((candle.Delta * deltaPer) * volPerSecond);
+                var deltaShaved = candle.Delta * deltaPer;
+
+                // Delta Divergence
+                if ((c0G && candle.Delta < 0) || (c0R && candle.Delta > 0))
+                    iFutureSound = 22;
+            }
 
             #endregion
 
@@ -817,7 +760,7 @@ namespace ATAS.Indicators.Technical
             slowEma.Calculate(pbar, value);
             _9.Calculate(pbar, value);
             _21.Calculate(pbar, value);
-            _macd.Calculate(pbar, value);
+
             _bb.Calculate(pbar, value);
             _rsi.Calculate(pbar, value);
             Ema200.Calculate(pbar, value);
@@ -827,9 +770,6 @@ namespace ATAS.Indicators.Technical
             var kama9 = ((ValueDataSeries)_kama9.DataSeries[0])[pbar];
 
             var ao = ((ValueDataSeries)_ao.DataSeries[0])[pbar];
-            var m1 = ((ValueDataSeries)_macd.DataSeries[0])[pbar]; // macd
-            var m2 = ((ValueDataSeries)_macd.DataSeries[1])[pbar]; // signal
-            var m3 = ((ValueDataSeries)_macd.DataSeries[2])[pbar]; // difference
             var t3 = ((ValueDataSeries)_t3.DataSeries[0])[pbar];
             var fast = ((ValueDataSeries)fastEma.DataSeries[0])[pbar];
             var fastM = ((ValueDataSeries)fastEma.DataSeries[0])[pbar - 1];
@@ -867,13 +807,20 @@ namespace ATAS.Indicators.Technical
             var rsi2 = ((ValueDataSeries)_rsi.DataSeries[0])[pbar - 2];
             var hma = ((ValueDataSeries)_hma.DataSeries[0])[pbar];
             var phma = ((ValueDataSeries)_hma.DataSeries[0])[pbar - 1];
+            var stack = ((ValueDataSeries)SI.DataSeries[0])[pbar];
+
+            // Linda MACD
+            var macd = _Sshort.Calculate(pbar, value) - _Slong.Calculate(pbar, value);
+            var signal = _Ssignal.Calculate(pbar, macd);
+            var m3 = macd - signal;
 
             var hullUp = hma > phma;
             var hullDown = hma < phma;
             var fisherUp = (f1 < f2);
             var fisherDown = (f2 < f1);
-            var macdUp = (m1 > m2);
-            var macdDown = (m1 < m2);
+            var macdUp = (macd > signal);
+            var macdDown = (macd < signal);
+
             var psarBuy = (psar < candle.Close);
             var ppsarBuy = (ppsar < pcandle.Close);
             var psarSell = (psar > candle.Close);
@@ -891,11 +838,6 @@ namespace ATAS.Indicators.Technical
             var prevT1 = ((fastM - slowM) - (fastN - slowN)) * iWaddaSensitivity;
             var s1 = bb_top - bb_bottom;
 
-            // Linda MACD
-            var macd = _Sshort.Calculate(pbar, value) - _Slong.Calculate(pbar, value);
-            var signal = _Ssignal.Calculate(pbar, macd);
-            m3 = macd - signal;
-
             #endregion
 
             var bDoji = false;
@@ -911,21 +853,32 @@ namespace ATAS.Indicators.Technical
             if (c1R && Math.Abs(p1C.Close - p1C.Low) > c1Body && Math.Abs(p1C.Open - p1C.High) > c1Body)
                 bpDoji = true;
 
+            if (rsi > 70 && rsi1 < 70)
+                iFutureSound = 20;
+            if (rsi < 30 && rsi1 > 30)
+                iFutureSound = 21;
+
             var bEMA200Bounce = false;
             var bVWAPBounce = false;
             var bKAMABounce = false;
+            decimal c0UpWick = 0;
+            decimal c0DownWick = 0;
 
-            if (c0R)
-            {
-                bEMA200Bounce = (candle.High > e200 && candle.Open < e200);// || (candle.Low < e200 && value > e200);
-                bVWAPBounce = (candle.High > vwap && candle.Open < vwap);//  || (candle.Low < vwap && value > vwap);
-                bKAMABounce = (candle.High > kama9 && candle.Open < kama9);
-            }
-            else if (c0G)
+            if (c0G)
             {
                 bEMA200Bounce = (candle.Low < e200 && candle.Open > e200); // (candle.High > e200 && value < e200) ||
                 bVWAPBounce = (candle.Low < vwap && candle.Open > vwap); // (candle.High > vwap && value < vwap) || 
                 bKAMABounce = (candle.Low < kama9 && candle.Open > kama9);
+                c0UpWick = Math.Abs(candle.High - candle.Close);
+                c0DownWick = Math.Abs(candle.Low - candle.Open);
+            }
+            else if (c0R)
+            {
+                bEMA200Bounce = (candle.High > e200 && candle.Open < e200); // || (candle.Low < e200 && value > e200);
+                bVWAPBounce = (candle.High > vwap && candle.Open < vwap); //  || (candle.Low < vwap && value > vwap);
+                bKAMABounce = (candle.High > kama9 && candle.Open < kama9);
+                c0UpWick = Math.Abs(candle.High - candle.Open);
+                c0DownWick = Math.Abs(candle.Low - candle.Close);
             }
 
             if (bEMA200Bounce || bVWAPBounce)
@@ -951,13 +904,13 @@ namespace ATAS.Indicators.Technical
                 {
                     _upCloud[pbar].Upper = _kama9[pbar] + 500;
                     _upCloud[pbar].Lower = _kama9[pbar] - 500;
-                    bWadGreen = true;
+                    //bWadGreen = true;
                 }
                 if (t1 <= 0 && Math.Abs(t1) > s1) // && bWadGreen) // && Math.Abs(t1) > Math.Abs(prevT1)
                 {
                     _dnCloud[pbar].Upper = _kama9[pbar] + 500;
                     _dnCloud[pbar].Lower = _kama9[pbar] - 500;
-                    bWadGreen = false;
+                    //bWadGreen = false;
                 }
             }
 
@@ -1005,6 +958,9 @@ namespace ATAS.Indicators.Technical
 
             if (bShowUp && bShowRegularBuySell)
             {
+                if (bIgnoreBadWicks)
+                    if ((c0UpWick > (c0Body * 3) && c0DownWick < c0Body) || bDoji)
+                        return;
                 _posSeries[pbar] = candle.Low - (_tick * iOffset);
                 iFutureSound = 10;
             }
@@ -1014,6 +970,9 @@ namespace ATAS.Indicators.Technical
 
             if (bShowDown && bShowRegularBuySell)
             {
+                if (bIgnoreBadWicks)
+                    if ((c0DownWick > (c0Body * 3) && c0UpWick < c0Body) || bDoji)
+                        return;
                 _negSeries[pbar] = candle.High + _tick * iOffset;
                 iFutureSound = 11;
             }
@@ -1082,11 +1041,15 @@ namespace ATAS.Indicators.Technical
                 var rPen = new Pen(new SolidBrush(Color.Transparent)) { Width = 3 };
 
                 if ((candle.Low < bb_bottom || p1C.Low < bb_bottom || p2C.Low < bb_bottom) && c0Body > c1Body && c0G && c1R && candle.Close > p1C.Open)
-                    Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, gPen, 
-                        new SolidBrush(colorEngulfg)));
+                {
+                    Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, gPen, new SolidBrush(colorEngulfg)));
+                    iFutureSound = 17;
+                }
                 else if ((candle.High > bb_top || p1C.High > bb_top || p2C.High > bb_top) && c0Body > c1Body && c0R && c1G && candle.Open < p1C.Close)
-                    Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, rPen, 
-                        new SolidBrush(colorEngulfr)));
+                {
+                    Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, rPen, new SolidBrush(colorEngulfr)));
+                    iFutureSound = 17;
+                }
             }
 
             if (bShowLines)
@@ -1104,9 +1067,17 @@ namespace ATAS.Indicators.Technical
                 var dLowerLevel = median - atr * 1.7m;
 
                 if ((std1 != 0 && std2 != 0) || (std3 != 0 && std2 != 0) || (std3 != 0 && std1 != 0))
+                {
                     _dnTrend[pbar] = dUpperLevel;
+                    if (_dnTrend[pbar-1] == dLowerLevel)
+                        iFutureSound = 15;
+                }
                 else if ((stu1 != 0 && stu2 != 0) || (stu3 != 0 && stu2 != 0) || (stu1 != 0 && stu3 != 0))
+                {
                     _upTrend[pbar] = dLowerLevel;
+                    if (_upTrend[pbar - 1] == dUpperLevel)
+                        iFutureSound = 14;
+                }
             }
 
             // Squeeze momentum relaxer show
@@ -1232,55 +1203,91 @@ namespace ATAS.Indicators.Technical
                     {
                         case 1:
                             play("majorline");
-                            Task.Run(() => SendWebhookAndWriteToFile("MAJOR LINE WICKED taco ", InstrumentInfo.Instrument, priceString));
+                            Task.Run(() => SendWebhookAndWriteToFile("MAJOR LINE WICKED taco ", InstrumentInfo.Instrument, priceString, "majorline"));
                             break;
                         case 2:
                             play("VolRev");
-                            Task.Run(() => SendWebhookAndWriteToFile("VOLUME REVERSED taco ", InstrumentInfo.Instrument, priceString));
+                            Task.Run(() => SendWebhookAndWriteToFile("VOLUME REVERSED taco", InstrumentInfo.Instrument, priceString, "VolRev"));
                             break;
                         case 3:
                             play("intensity");
-                            Task.Run(() => SendWebhookAndWriteToFile("INTENSITY taco ", InstrumentInfo.Instrument, priceString));
+                            Task.Run(() => SendWebhookAndWriteToFile("INTENSITY taco", InstrumentInfo.Instrument, priceString, "intensity"));
                             break;
                         case 4:
                             play("stairs");
-                            Task.Run(() => SendWebhookAndWriteToFile("STAIRS taco ", InstrumentInfo.Instrument, priceString));
+                            Task.Run(() => SendWebhookAndWriteToFile("STAIRS taco", InstrumentInfo.Instrument, priceString, "stairs"));
                             break;
                         case 5:
                             play("squeezie");
-                            Task.Run(() => SendWebhookAndWriteToFile("SQUEEZED taco ", InstrumentInfo.Instrument, priceString));
+                            Task.Run(() => SendWebhookAndWriteToFile("SQUEEZED taco", InstrumentInfo.Instrument, priceString, "squeezie"));
                             break;
                         case 6:
                             play("equal high");
-                            Task.Run(() => SendWebhookAndWriteToFile("EQUAL HIGH taco ", InstrumentInfo.Instrument, priceString));
+                            Task.Run(() => SendWebhookAndWriteToFile("EQUAL HIGH taco", InstrumentInfo.Instrument, priceString, "equalhigh"));
                             break;
                         case 7:
                             play("equal low");
-                            Task.Run(() => SendWebhookAndWriteToFile("EQUAL LOW taco ", InstrumentInfo.Instrument, priceString));
+                            Task.Run(() => SendWebhookAndWriteToFile("EQUAL LOW taco", InstrumentInfo.Instrument, priceString, "equallow"));
                             break;
                         case 8:
                             play("trampoline");
-                            Task.Run(() => SendWebhookAndWriteToFile("TRAMPOLINE taco ", InstrumentInfo.Instrument, priceString));
+                            Task.Run(() => SendWebhookAndWriteToFile("TRAMPOLINE taco", InstrumentInfo.Instrument, priceString, "trampoline"));
                             break;
                         case 9:
                             play("kama");
-                            Task.Run(() => SendWebhookAndWriteToFile("KAMA BOUNCE taco ", InstrumentInfo.Instrument, priceString));
+                            Task.Run(() => SendWebhookAndWriteToFile("KAMA BOUNCE taco", InstrumentInfo.Instrument, priceString, "kama"));
                             break;
                         case 10:
                             play("buy");
-                            Task.Run(() => SendWebhookAndWriteToFile("BOUGHT taco ", InstrumentInfo.Instrument, priceString));
+                            Task.Run(() => SendWebhookAndWriteToFile("BOUGHT taco", InstrumentInfo.Instrument, priceString, "buy"));
                             break;
                         case 11:
                             play("sell");
-                            Task.Run(() => SendWebhookAndWriteToFile("SOLD taco ", InstrumentInfo.Instrument, priceString));
+                            Task.Run(() => SendWebhookAndWriteToFile("SOLD taco", InstrumentInfo.Instrument, priceString, "sell"));
                             break;
                         case 12:
                             play("volimb");
-                            Task.Run(() => SendWebhookAndWriteToFile("IMBALANCED a chalupa ", InstrumentInfo.Instrument, priceString));
+                            Task.Run(() => SendWebhookAndWriteToFile("IMBALANCED chalupa", InstrumentInfo.Instrument, priceString, "volimb"));
                             break;
                         case 13:
                             play("dojicity");
-                            Task.Run(() => SendWebhookAndWriteToFile("DOJI CITY a chalupa ", InstrumentInfo.Instrument, priceString));
+                            Task.Run(() => SendWebhookAndWriteToFile("DOJI CITY chalupa", InstrumentInfo.Instrument, priceString, "dojicity"));
+                            break;
+                        case 14:
+                            play("superGREEN");
+                            Task.Run(() => SendWebhookAndWriteToFile("SuperTrend GREEN", InstrumentInfo.Instrument, priceString, ""));
+                            break;
+                        case 15:
+                            play("superRED");
+                            Task.Run(() => SendWebhookAndWriteToFile("SuperTrend RED", InstrumentInfo.Instrument, priceString, ""));
+                            break;
+                        case 16:
+                            play("vol2x");
+                            Task.Run(() => SendWebhookAndWriteToFile("DOUBLE VOLUME", InstrumentInfo.Instrument, priceString, ""));
+                            break;
+                        case 17:
+                            play("engulf");
+                            Task.Run(() => SendWebhookAndWriteToFile("ENGULFING CANDLE", InstrumentInfo.Instrument, priceString, ""));
+                            break;
+                        case 18:
+                            play("choppy");
+                            Task.Run(() => SendWebhookAndWriteToFile("CHOPPY WATERS", InstrumentInfo.Instrument, priceString, ""));
+                            break;
+                        case 19:
+                            play("stacked");
+                            Task.Run(() => SendWebhookAndWriteToFile("STACKED IMBALANCE", InstrumentInfo.Instrument, priceString, ""));
+                            break;
+                        case 20:
+                            play("rsiOB");
+                            Task.Run(() => SendWebhookAndWriteToFile("RSI OVERBOUGHT", InstrumentInfo.Instrument, priceString, ""));
+                            break;
+                        case 21:
+                            play("rsiOS");
+                            Task.Run(() => SendWebhookAndWriteToFile("RSI OVERSOLD", InstrumentInfo.Instrument, priceString, ""));
+                            break;
+                        case 22:
+                            play("divergence");
+                            Task.Run(() => SendWebhookAndWriteToFile("DELTA DIVERGENCE", InstrumentInfo.Instrument, priceString, ""));
                             break;
                         default: break;
                     }
@@ -1357,9 +1364,65 @@ namespace ATAS.Indicators.Technical
 
         #region MISC FUNCTIONS
 
+        private void MarkOpenSession(int bar)
+        {
+            var candle = GetCandle(bar);
+            var diff = InstrumentInfo.TimeZone;
+            var time = candle.Time.AddHours(diff);
+            var today = DateTime.Today.Year.ToString() + "-" + DateTime.Today.Month.ToString() + "-" + DateTime.Today.Day.ToString();
+
+            if (time > DateTime.Parse(today + " 08:20AM") && time < DateTime.Parse(today + " 08:29AM"))
+            {
+                _highest = candle.High;
+                _highBar = bar;
+                _lowest = candle.Low;
+                _lowBar = bar;
+            }
+
+            if (time > DateTime.Parse(today + " 08:30AM") && time < DateTime.Parse(today + " 09:30AM"))
+            {
+                if (candle.High > _highest)
+                {
+                    _highest = candle.High;
+                    _highBar = bar;
+                }
+                if (candle.Low < _lowest)
+                {
+                    _lowest = candle.Low;
+                    _lowBar = bar;
+                }
+            }
+
+            // LONDON SESSION TIMES
+            if (time > DateTime.Parse(today + " 01:50AM") && time < DateTime.Parse(today + " 01:59AM"))
+            {
+                _highestL = candle.High;
+                _highBarL = bar;
+                _lowestL = candle.Low;
+                _lowBarL = bar;
+            }
+
+            if (time > DateTime.Parse(today + " 02:00AM") && time < DateTime.Parse(today + " 03:00AM"))
+            {
+                if (candle.High > _highestL)
+                {
+                    _highestL = candle.High;
+                    _highBarL = bar;
+                }
+                if (candle.Low < _lowestL)
+                {
+                    _lowestL = candle.Low;
+                    _lowBarL = bar;
+                }
+            }
+        }
+
         private async Task SendWebhook(string message, string ticker, string price)
         {
-            var fullMessage = $"{message} from {ticker} for ${price}";
+            DateTime bitches = new DateTime();
+            bitches = DateTime.Now;
+            bitches = bitches.AddHours(1);
+            var fullMessage = $"{message} from {ticker} for ${price} at " + bitches.ToString("h:mm:ss tt") + " EST";
             var payload = new { content = fullMessage };
             var jsonPayload = JsonConvert.SerializeObject(payload);
             var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
@@ -1368,17 +1431,12 @@ namespace ATAS.Indicators.Technical
         }
         private SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
 
-        private async Task WriteToTextFile(string message, string ticker, string price)
+        private async Task WriteToTextFile(string file)
         {
-            var fullMessage = $"{message} for {ticker} at price {price}";
-
             await semaphore.WaitAsync();
             try
             {
-                using (StreamWriter writer = new StreamWriter(@"C:\temp\output.txt", true))
-                {
-                    await writer.WriteLineAsync(fullMessage);
-                }
+                System.Diagnostics.Process.Start("cmd.exe", "/c " + sWavDir + @"\copyimage.bat " + file);
             }
             finally
             {
@@ -1386,10 +1444,14 @@ namespace ATAS.Indicators.Technical
             }
         }
 
-        private async Task SendWebhookAndWriteToFile(string message, string ticker, string price)
+        private async Task SendWebhookAndWriteToFile(string message, string ticker, string price, string file)
         {
+            var token = Environment.GetEnvironmentVariable("Webhook");
+            if (token == "")
+                return;
+
             var sendWebhookTask = SendWebhook(message, ticker, price);
-            var writeToTextFileTask = WriteToTextFile(message, ticker, price);
+            var writeToTextFileTask = WriteToTextFile(file);
 
             await Task.WhenAll(sendWebhookTask, writeToTextFileTask);
         }
@@ -1454,21 +1516,6 @@ namespace ATAS.Indicators.Technical
                 return Color.FromArgb(78, 152, 242);
 
             return Color.White;
-        }
-
-        private void PlaySound(String s, int bar)
-        {
-            if (bar > CurrentBar - 2)
-                try
-                {
-                    string appPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                    SoundPlayer player = new SoundPlayer();
-                    player.SoundLocation = appPath + "\\sounds\\" + s + ".wav";
-                    player.Play();
-                }
-                catch
-                {
-                }
         }
 
         #endregion
