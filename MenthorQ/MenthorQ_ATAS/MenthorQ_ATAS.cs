@@ -8,6 +8,7 @@ namespace ATAS.Indicators.Technical
     using System.Drawing;
     using ATAS.Indicators;
     using ATAS.Indicators.Drawing;
+    using DomV10;
     using OFT.Rendering.Context;
     using OFT.Rendering.Tools;
 
@@ -30,10 +31,9 @@ namespace ATAS.Indicators.Technical
             public Color c;
         }
 
+        private int iFontSize = 7;
         private List<shit> lsS = new List<shit>();
         private bool bShowMain = true;
-        private bool bShowGEX = true;
-        private bool bShowBlind = true;
         private bool bUseAlerts = true;
         private bool bAlertWick = false;
         private bool bShowText = true;
@@ -55,11 +55,31 @@ namespace ATAS.Indicators.Technical
         private string sBS4 = string.Empty;
         private string sBS5 = string.Empty;
 
-        Color cLong = Color.FromArgb(255, 2, 71, 1);
-        Color cShort = Color.FromArgb(255, 82, 1, 1);
-        Color cLine = Color.FromArgb(255, 128, 125, 125);
-        Color cMTS = Color.FromArgb(255, 68, 100, 242);
-        Color cTS = Color.FromArgb(255, 68, 100, 242);
+        private bool bShowGEX1 = true;
+        private bool bShowGEX2 = true;
+        private bool bShowGEX3 = true;
+        private bool bShowGEX4 = true;
+        private bool bShowGEX5 = true;
+        private bool bShowGEX6 = true;
+        private bool bShowGEX7 = true;
+        private bool bShowGEX8 = true;
+        private bool bShowGEX9 = true;
+        private bool bShowGEX10 = true;
+        private bool bShowMax = true;
+        private bool bShowMin = true;
+        private bool bShowHVL = true;
+        private bool bShowWall = true;
+        private bool bShowResist = true;
+        private bool bShowSupport = true;
+
+        Color cBL = Color.DarkCyan;
+        Color cMin = Color.Red;
+        Color cMax = Color.Red;
+        Color cHVL = Color.Cyan;
+        Color cSupport = Color.Lime;
+        Color cResist = Color.Red;
+        Color cWall = Color.GreenYellow;
+        Color cGEX = Color.CadetBlue;
 
         public MenthorQ() :
             base(true)
@@ -95,8 +115,9 @@ namespace ATAS.Indicators.Technical
         [Display(GroupName = "Options", Name = "Show Text")]
         public bool ShowText { get => bShowText; set { bShowText = value; RecalculateValues(); } }
 
-        [Display(GroupName = "Options", Name = "Show GEX Lines")]
-        public bool ShowGEX { get => bShowGEX; set { bShowGEX = value; RecalculateValues(); } }
+        [Display(GroupName = "Options", Name = "Text Font Size")]
+        public int FontSize { get => iFontSize; set { iFontSize = value; RecalculateValues(); } }
+
 
         //[Display(GroupName = "Options", Name = "Alert on Touch Line")]
         //public bool UseAlerts { get => bUseAlerts; set { bUseAlerts = value; RecalculateValues(); } }
@@ -104,20 +125,55 @@ namespace ATAS.Indicators.Technical
         //[Display(GroupName = "Options", Name = "Alert on Wick Through Line")]
         //public bool AlertWick { get => bAlertWick; set { bAlertWick = value; RecalculateValues(); } }
 
-        //[Display(GroupName = "Colors", Name = "Long Color")]
-        //public Color brLong { get => cLong; set { cLong = value; RecalculateValues(); } }
-  
-        //[Display(GroupName = "Colors", Name = "Short Color")]
-        //public Color caShort { get => cShort; set { cShort = value; RecalculateValues(); } }
+        [Display(GroupName = "Colors", Name = "GEX Color")]
+        public Color GEX { get => cGEX; set { cGEX = value; RecalculateValues(); } }
+        [Display(GroupName = "Colors", Name = "BlindSpot Color")]
+        public Color cBLa { get => cBL; set { cBL = value; RecalculateValues(); } }
+        [Display(GroupName = "Colors", Name = "Min Color")]
+        public Color Min { get => cMin; set { cMin = value; RecalculateValues(); } }
+        [Display(GroupName = "Colors", Name = "Max Color")]
+        public Color Max { get => cMax; set { cMax = value; RecalculateValues(); } }
+        [Display(GroupName = "Colors", Name = "HVL Color")]
+        public Color HVL { get => cHVL; set { cHVL = value; RecalculateValues(); } }
+        [Display(GroupName = "Colors", Name = "Support Color")]
+        public Color Support { get => cSupport; set { cSupport = value; RecalculateValues(); } }
+        [Display(GroupName = "Colors", Name = "Resistance Color")]
+        public Color Resist { get => cResist; set { cResist = value; RecalculateValues(); } }
+        [Display(GroupName = "Colors", Name = "Wall Color")]
+        public Color Wall { get => cWall; set { cWall = value; RecalculateValues(); } }
 
-        //[Display(GroupName = "Colors", Name = "LIS Color")]
-        //public Color caLine { get => cLine; set { cLine = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show GEX 1")]
+        public bool ShowGEX1 { get => bShowGEX1; set { bShowGEX1 = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show GEX 2")]
+        public bool ShowGEX2 { get => bShowGEX2; set { bShowGEX2 = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show GEX 3")]
+        public bool ShowGEX3 { get => bShowGEX3; set { bShowGEX3 = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show GEX 4")]
+        public bool ShowGEX4 { get => bShowGEX4; set { bShowGEX4 = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show GEX 5")]
+        public bool ShowGEX5 { get => bShowGEX5; set { bShowGEX5 = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show GEX 6")]
+        public bool ShowGEX6 { get => bShowGEX6; set { bShowGEX6 = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show GEX 7")]
+        public bool ShowGEX7 { get => bShowGEX7; set { bShowGEX7 = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show GEX 8")]
+        public bool ShowGEX8 { get => bShowGEX8; set { bShowGEX8 = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show GEX 9")]
+        public bool ShowGEX9 { get => bShowGEX9; set { bShowGEX9 = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show GEX 10")]
+        public bool ShowGEX10 { get => bShowGEX10; set { bShowGEX10 = value; RecalculateValues(); } }
 
-        //[Display(GroupName = "Colors", Name = "GEX Line Color")]
-        //public Color caMTS { get => cMTS; set { cMTS = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show Min")]
+        public bool ShowMin { get => bShowMin; set { bShowMin = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show Max")]
+        public bool ShowMax { get => bShowMax; set { bShowMax = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show Wall")]
+        public bool ShowWall { get => bShowWall; set { bShowWall = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show Resistance")]
+        public bool ShowResist { get => bShowResist; set { bShowResist = value; RecalculateValues(); } }
+        [Display(GroupName = "Show / Hide", Name = "Show Support")]
+        public bool ShowSupport { get => bShowSupport; set { bShowSupport = value; RecalculateValues(); } }
 
-        //[Display(GroupName = "Colors", Name = "Blind Spot Color")]
-        //public Color caTS { get => cTS; set { cTS = value; RecalculateValues(); } }
         #endregion
 
     #region RENDER
@@ -128,18 +184,41 @@ namespace ATAS.Indicators.Technical
 
             Color color = Color.Gray;
             if (bShowText)
-            foreach (var l in lsS)
-                if (l.ticker.Substring(0, 2) == InstrumentInfo.Instrument.Substring(0, 2))
-                {
-                    var highPen = new RenderPen(color) { Width = 2 };
-                    var xH = ChartInfo.PriceChartContainer.GetXByBar(CurrentBar, false);
-                    var yH = ChartInfo.PriceChartContainer.GetYByPrice(l.price, false);
-                    context.DrawString(l.label, new RenderFont("Arial", 7), l.c, xH, yH);
-                }
+                foreach (var l in lsS)
+                    if (l.ticker.Contains(InstrumentInfo.Instrument))
+                    {
+                        var highPen = new RenderPen(color) { Width = 2 };
+                        var xH = ChartInfo.PriceChartContainer.GetXByBar(CurrentBar, false);
+                        var yH = ChartInfo.PriceChartContainer.GetYByPrice(l.price, false);
+                        context.DrawString(l.label, new RenderFont("Arial", iFontSize), l.c, xH, yH);
+                    }
         }
     #endregion
 
     #region PROCESS DATA
+
+        protected bool checkShow(string s)
+        {
+            if (s.Contains("GEX 10") && bShowGEX10) return true;
+            else if (s.Equals("GEX 1") && bShowGEX1) return true;
+            else if (s.Contains("GEX 2") && bShowGEX2) return true;
+            else if (s.Contains("GEX 3") && bShowGEX3) return true;
+            else if (s.Contains("GEX 4") && bShowGEX4) return true;
+            else if (s.Contains("GEX 5") && bShowGEX5) return true;
+            else if (s.Contains("GEX 6") && bShowGEX6) return true;
+            else if (s.Contains("GEX 7") && bShowGEX7) return true;
+            else if (s.Contains("GEX 8") && bShowGEX8) return true;
+            else if (s.Contains("GEX 9") && bShowGEX9) return true;
+            else if (s.Contains("HVL") && bShowHVL) return true;
+            else if (s.Contains("Wall") && bShowWall) return true;
+            else if (s.Contains("Min") && bShowMin) return true;
+            else if (s.Contains("Max") && bShowMax) return true;
+            else if (s.Contains("Support") && bShowSupport) return true;
+            else if (s.Contains("Resist") && bShowResist) return true;
+            else if (s.Contains("BL ") && bShowResist) return true;
+            return false;
+        }
+
         protected void DoParse(string s)
         {
             if (string.IsNullOrEmpty(s))
@@ -161,21 +240,25 @@ namespace ATAS.Indicators.Technical
 
                     if (!string.IsNullOrEmpty(price) && !string.IsNullOrEmpty(desc))
                     {
+                        if (!checkShow(desc))
+                            continue;
                         Color cl = Color.White;
-                        if (desc.Contains("Support") || desc.Contains("Min"))
-                            cl = Color.Lime;
+                        if (desc.Contains("Support"))
+                            cl = cSupport;
+                        if (desc.Contains("Min"))
+                            cl = cMin;
                         else if (desc.Contains("GEX"))
-                        {
-                            cl = Color.LightSteelBlue;
-                            if (!bShowGEX)
-                                return;
-                        }
+                            cl = cGEX;
                         else if (desc.Contains("BL "))
-                            cl = Color.DarkCyan;
-                        else if (desc.Contains("HVL") || desc.Contains("Wall"))
-                            cl = Color.DimGray;
-                        else if (desc.Contains("Resist") || desc.Contains("Max"))
-                            cl = Color.Red;
+                            cl = cBL;
+                        else if (desc.Contains("HVL"))
+                            cl = cHVL;
+                        else if (desc.Contains("Wall"))
+                            cl = cWall;
+                        else if (desc.Contains("Resist"))
+                            cl = cResist;
+                        else if (desc.Contains("Max"))
+                            cl = cMax;
                         shit a = new shit();
                         a.price = Convert.ToDecimal(price);
                         a.label = desc;
@@ -191,12 +274,11 @@ namespace ATAS.Indicators.Technical
             }
             catch { }
         }
-        #endregion
 
         protected void DrawShit()
         {
             foreach (var l in lsS)
-                if (l.ticker.Substring(0, 2) == InstrumentInfo.Instrument.Substring(0, 2))
+                if (l.ticker.Contains(InstrumentInfo.Instrument))
                 {
                     var highPen = new Pen(new SolidBrush(l.c)) { Width = 1 };
                     DrawingRectangle dr = new DrawingRectangle(1, l.price, CurrentBar, l.price, highPen, new SolidBrush(l.c));
@@ -204,6 +286,20 @@ namespace ATAS.Indicators.Technical
                         Rectangles.Add(dr);
                 }
         }
+
+        private void LoadFromCSV(string sFile)
+        {
+            foreach (string s in File.ReadAllLines(sFile))
+            {
+                string sb = s.Split(':')[0].Trim();
+                if (sb.Split('.')[0].Trim().Equals(InstrumentInfo.Instrument))
+                {
+                    DoParse(s);
+                    break;
+                }
+            }
+        }
+        #endregion
 
         protected override void OnCalculate(int bar, decimal value)
         {
@@ -218,6 +314,11 @@ namespace ATAS.Indicators.Technical
 
             if (bar > CurrentBar - 3)
             {
+                if (File.Exists(@"C:\Program Files (x86)\ATAS Platform\SierraChart Q-Levels.txt"))
+                    LoadFromCSV(@"C:\Program Files (x86)\ATAS Platform\SierraChart Q-Levels.txt");
+                if (File.Exists(@"C:\Program Files (x86)\ATAS Platform\ATAS Q-Levels.txt"))
+                    LoadFromCSV(@"C:\Program Files (x86)\ATAS Platform\ATAS Q-Levels.txt");
+
                 DoParse(sLvl1);
                 DoParse(sLvl2);
                 DoParse(sLvl3);
@@ -233,7 +334,7 @@ namespace ATAS.Indicators.Technical
 
             if (_lastBar != bar)
             {
-                if (_lastBarCounted && bUseAlerts)
+                if (_lastBarCounted) //  && bUseAlerts)
                     DrawShit();
                 _lastBar = bar;
             }
