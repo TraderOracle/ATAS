@@ -35,7 +35,7 @@ namespace ATAS.Indicators.Technical
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "4.1";
+        private const String sVersion = "4.2";
         private int iTouched = 0;
         private bool bVolImbFinished = false;
         private bool bRefreshLines = false;
@@ -311,14 +311,14 @@ namespace ATAS.Indicators.Technical
             if (ChartInfo is null || InstrumentInfo is null)
                 return;
 
-            if (bRefreshLines)
+            //if (bRefreshLines)
             foreach (var l in lsDays)
             {
                 var xH = ChartInfo.PriceChartContainer.GetXByBar(CurrentBar, false);
                 var yH = ChartInfo.PriceChartContainer.GetYByPrice(l.price1, false);
                 var yH2 = ChartInfo.PriceChartContainer.GetYByPrice(l.price2, false);
                 var yWidth = ChartInfo.ChartContainer.Region.Width;
-                RenderPen highPen = new RenderPen(l.c, 1, DashStyle.Dash);
+                RenderPen highPen = new RenderPen(l.c, 4, DashStyle.Dash);
                 var rectPen = new Pen(new SolidBrush(l.c)) { Width = 1 };
 
                 if (l.price2 > 0)
@@ -330,7 +330,7 @@ namespace ATAS.Indicators.Technical
                 else
                     context.DrawLine(highPen, 0, yH, xH, yH);
 
-                context.DrawString(l.label, new RenderFont("Arial", iFontSize), l.c, xH, yH);
+                context.DrawString(l.label, new RenderFont("Arial", iFontSize), Color.White, xH, yH);
                 bRefreshLines = false;
             }
 
@@ -727,7 +727,7 @@ namespace ATAS.Indicators.Technical
 
             if (bVolumeImbalances)
             {
-                var highPen = new Pen(new SolidBrush(Color.FromArgb(255, 169, 97, 250))) { Width = 3, DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+                var highPen = new Pen(new SolidBrush(Color.FromArgb(255, 135, 183, 255))) { Width = 3, DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
                 if (green && c1G && candle.Open > p1C.Close)
                 {
                     HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
@@ -908,11 +908,34 @@ namespace ATAS.Indicators.Technical
             try
             {
                 days a = new days();
-                a.c = s.Contains("Long") ? Color.Green : s.Contains("Short") ? 
-                    Color.Red : s.Contains("Sand") ? Color.FromArgb(255, 169, 97, 250) : Color.Yellow;
+                if (s.Contains("Short"))
+                {
+                    if (price == price2)
+                        a.c = Color.Red;
+                    else
+                        a.c = Color.DarkRed;
+                }
+                else if (s.Contains("Long"))
+                {
+                    if (price == price2)
+                        a.c = Color.Lime;
+                    else
+                        a.c = Color.Green;
+                }
+                else if (s.Contains("Sand"))
+                {
+                    if (price == price2)
+                        a.c = Color.White;
+                    else
+                        a.c = Color.FromArgb(155, 139, 61, 255);
+                }
+                else
+                    a.c = Color.Yellow;
                 a.label = s;
                 a.price1 = Convert.ToDecimal(price);
                 a.price2 = Convert.ToDecimal(price2);
+                if (a.price1 == a.price2 && s.Contains("Long"))
+                    a.c = Color.Lime;
                 lsDays.Add(a);
             }
             catch { }
@@ -939,7 +962,7 @@ namespace ATAS.Indicators.Technical
                             s1 = s.Substring(0, i).Trim();
                             s2 = s.Substring(i, s.Length - i).Trim();
                             string[] price = s1.Split('-');
-                            AddRecord(s1.Trim(), s1.Trim(), s2);
+                            AddRecord(price[0].Trim(), price[1].Trim(), s2);
                         }
                     }
                     else if (s.Contains(".") && !s.Contains("Numbers"))
@@ -962,8 +985,13 @@ namespace ATAS.Indicators.Technical
                             AddRecord(ac.Trim(), ac.Trim(), "MTS");
                     }
                 }
+                sr.Close();
+                sr.Dispose();
             }
-            catch { }
+            catch 
+            {
+                
+            }
             bRefreshLines = true;
         }
 
