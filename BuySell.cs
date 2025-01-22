@@ -35,10 +35,7 @@ namespace ATAS.Indicators.Technical
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "4.2";
-        private int iTouched = 0;
-        private bool bVolImbFinished = false;
-        private bool bRefreshLines = false;
+        private const String sVersion = "4.5";
 
         #region PRIVATE FIELDS
 
@@ -74,10 +71,12 @@ namespace ATAS.Indicators.Technical
         private List<bars> lsBar = new List<bars>();
         private List<string> lsH = new List<string>();
         private List<string> lsM = new List<string>();
+        List<int> LineTouches = new List<int>();
         private bool bBigArrowUp = false;
         private static readonly HttpClient client = new HttpClient();
         private readonly PaintbarsDataSeries _paintBars = new("Paint bars");
 
+        private int iTouched = 0;
         private String _highS = "1st Hour High";
         private String _lowS = "1st Hour Low";
         private String _highL = "London High";
@@ -100,12 +99,15 @@ namespace ATAS.Indicators.Technical
         private bool bShowUp = true;
         private bool bShowDown = true;
         private bool bShowLondon = false;
+        private bool bShowTS = true;
+        private bool bVolImbFinished = false;
+        private bool bTraderSmartsLoaded = false;
 
         // Default TRUE
         private bool bShowEngBB = true;
-        private bool bShowTramp = true;          // SHOW
+        private bool bShowTramp = true;          
         private bool bShowNews = true;
-        private bool bUseFisher = true;          // USE
+        private bool bUseFisher = true;          
         private bool bUseWaddah = true;
         private bool bUseT3 = false;
         private bool bUsePSAR = true;
@@ -113,7 +115,7 @@ namespace ATAS.Indicators.Technical
         private bool bVolumeImbalances = true;
 
         private bool bKAMAWick = true;
-        private bool bNewsProcessed = false;     // USE
+        private bool bNewsProcessed = false;     
         private bool bUseSuperTrend = false;
         private bool bUseSqueeze = false;
         private bool bUseMACD = true;
@@ -205,6 +207,10 @@ namespace ATAS.Indicators.Technical
         public bool KAMAWick { get => bKAMAWick; set { bKAMAWick = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "WAV Sound Directory")]
         public String WavDir { get => sWavDir; set { sWavDir = value; RecalculateValues(); } }
+
+        [Display(GroupName = "Extras", Name = "Show TraderSmarts")]
+        public bool ShowTS { get => bShowTS; set { bShowTS = value; RecalculateValues(); } }
+
         [Display(GroupName = "Extras", Name = "TraderSmarts File")]
         public String stsFile { get => tsFile; set { tsFile = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "Show Kama/EMA 200/VWAP lines")]
@@ -311,27 +317,28 @@ namespace ATAS.Indicators.Technical
             if (ChartInfo is null || InstrumentInfo is null)
                 return;
 
-            //if (bRefreshLines)
-            foreach (var l in lsDays)
+            if (bShowTS)
             {
-                var xH = ChartInfo.PriceChartContainer.GetXByBar(CurrentBar, false);
-                var yH = ChartInfo.PriceChartContainer.GetYByPrice(l.price1, false);
-                var yH2 = ChartInfo.PriceChartContainer.GetYByPrice(l.price2, false);
-                var yWidth = ChartInfo.ChartContainer.Region.Width;
-                RenderPen highPen = new RenderPen(l.c, 4, DashStyle.Dash);
-                var rectPen = new Pen(new SolidBrush(l.c)) { Width = 1 };
-
-                if (l.price2 > 0)
+                foreach (var l in lsDays)
                 {
-                    DrawingRectangle dr = new DrawingRectangle(1, l.price1, CurrentBar, l.price2, rectPen, new SolidBrush(l.c));
-                    if (!Rectangles.Contains(dr))
-                        Rectangles.Add(dr);
-                }
-                else
-                    context.DrawLine(highPen, 0, yH, xH, yH);
+                    var xH = ChartInfo.PriceChartContainer.GetXByBar(CurrentBar, false);
+                    var yH = ChartInfo.PriceChartContainer.GetYByPrice(l.price1, false);
+                    var yH2 = ChartInfo.PriceChartContainer.GetYByPrice(l.price2, false);
+                    var yWidth = ChartInfo.ChartContainer.Region.Width;
+                    RenderPen highPen = new RenderPen(l.c, 4, DashStyle.Dash);
+                    var rectPen = new Pen(new SolidBrush(l.c)) { Width = 1 };
 
-                context.DrawString(l.label, new RenderFont("Arial", iFontSize), Color.White, xH, yH);
-                bRefreshLines = false;
+                    if (l.price2 > 0)
+                    {
+                        DrawingRectangle dr = new DrawingRectangle(1, l.price1, CurrentBar, l.price2, rectPen, new SolidBrush(l.c));
+                        if (!Rectangles.Contains(dr))
+                            Rectangles.Add(dr);
+                    }
+                    else
+                        context.DrawLine(highPen, 0, yH, xH, yH);
+
+                    context.DrawString(l.label, new RenderFont("Arial", iFontSize), Color.White, xH, yH);
+                }
             }
 
             if (bShowLondon)
@@ -694,6 +701,8 @@ namespace ATAS.Indicators.Technical
 
             #endregion
 
+            #region BUY / SELL
+
             var bEMA200Bounce = false;
             var bVWAPBounce = false;
             var bKAMABounce = false;
@@ -723,20 +732,27 @@ namespace ATAS.Indicators.Technical
             if (bKAMABounce && bKAMAWick)
                 _paintBars[pbar] = MColor.FromRgb(255, 255, 255);
 
-            #region BUY / SELL
-
             if (bVolumeImbalances)
             {
-                var highPen = new Pen(new SolidBrush(Color.FromArgb(255, 135, 183, 255))) { Width = 3, DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+                var highPen = new Pen(new SolidBrush(Color.FromArgb(255, 135, 183, 255))) 
+                { Width = 3, DashStyle = DashStyle.Dash };
                 if (green && c1G && candle.Open > p1C.Close)
                 {
-                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
-                    _negWhite[pbar] = candle.Low - (_tick * 2);
+                    if (LineTouches.IndexOf(bar) == -1)
+                    {
+                        LineTouches.Add(bar);
+                        HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
+                        _negWhite[pbar] = candle.Low - (_tick * 2);
+                    }
                 }
                 if (red && c1R && candle.Open < p1C.Close)
                 {
-                    HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
-                    _posWhite[pbar] = candle.High + (_tick * 2);
+                    if (LineTouches.IndexOf(bar) == -1)
+                    {
+                        LineTouches.Add(bar);
+                        HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
+                        _posWhite[pbar] = candle.High + (_tick * 2);
+                    }
                 }
             }
 
@@ -789,17 +805,17 @@ namespace ATAS.Indicators.Technical
 
             if (bShowEngBB)
             {
-                var gPen = new Pen(new SolidBrush(Color.Transparent)) { Width = 3 };
-                var rPen = new Pen(new SolidBrush(Color.Transparent)) { Width = 3 };
+                //var gPen = new Pen(new SolidBrush(Color.Lime)) { Width = 1 };
+                //var rPen = new Pen(new SolidBrush(Color.Orange)) { Width = 1 };
 
-                if ((candle.Low < bb_bottom || p1C.Low < bb_bottom || p2C.Low < bb_bottom) && c0Body > c1Body && c0G && c1R && candle.Close > p1C.Open)
-                {
-                    Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, gPen, new SolidBrush(colorEngulfg)));
-                }
-                else if ((candle.High > bb_top || p1C.High > bb_top || p2C.High > bb_top) && c0Body > c1Body && c0R && c1G && candle.Open < p1C.Close)
-                {
-                    Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, rPen, new SolidBrush(colorEngulfr)));
-                }
+                //if ((candle.Low < bb_bottom || p1C.Low < bb_bottom || p2C.Low < bb_bottom) && c0Body > c1Body && c0G && c1R && candle.Close > p1C.Open)
+                //{
+                //    Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, gPen, new SolidBrush(Color.Transparent)));
+                //}
+                //else if ((candle.High > bb_top || p1C.High > bb_top || p2C.High > bb_top) && c0Body > c1Body && c0R && c1G && candle.Open < p1C.Close)
+                //{
+                //    Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, rPen, new SolidBrush(Color.Transparent)));
+                //}
             }
 
             if (bShowLines)
@@ -852,7 +868,7 @@ namespace ATAS.Indicators.Technical
                     DrawText(pbar, "Vol\nRev", Color.Lime, Color.Transparent, false, true);
                 }
 
-                if (ThreeOutUp)
+                if (ThreeOutUp && bShowRevPattern)
                     DrawText(pbar, "3oU", Color.Yellow, Color.Transparent);
                 if (ThreeOutDown && bShowRevPattern)
                     DrawText(pbar, "3oD", Color.Yellow, Color.Transparent);
@@ -878,13 +894,10 @@ namespace ATAS.Indicators.Technical
 
             #region ALERTS LOGIC
 
-            DrawTraderSmarts();
-
             if (_lastBar != bar)
             {
                 if (_lastBarCounted && UseAlerts)
                 {
-                    DrawTraderSmarts();
                     var priceString = candle.Close.ToString();
                 }
                 _lastBar = bar;
@@ -899,6 +912,9 @@ namespace ATAS.Indicators.Technical
 
             if (!bNewsProcessed && bShowNews)
                 LoadStock(pbar);
+
+            if (!bTraderSmartsLoaded)
+                LoadTraderSmarts();
         }
 
         #region MISC FUNCTIONS
@@ -941,7 +957,7 @@ namespace ATAS.Indicators.Technical
             catch { }
         }
 
-        private void DrawTraderSmarts()
+        private void LoadTraderSmarts()
         {
             lsDays.Clear();
 
@@ -985,14 +1001,11 @@ namespace ATAS.Indicators.Technical
                             AddRecord(ac.Trim(), ac.Trim(), "MTS");
                     }
                 }
+                bTraderSmartsLoaded = true;
                 sr.Close();
                 sr.Dispose();
             }
-            catch 
-            {
-                
-            }
-            bRefreshLines = true;
+            catch { }
         }
 
             private void MarkOpenSession(int bar)
