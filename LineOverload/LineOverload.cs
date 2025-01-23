@@ -19,7 +19,7 @@ namespace ATAS.Indicators.Technical
     [DisplayName("LineOverload")]
     public class LineOverload : Indicator
     {
-        private const string sVersion = "1.0";
+        private const string sVersion = "1.1";
         private string sKPValues = "";
         private string sMQValues = "";
         private string sBlindSpots = "";
@@ -60,6 +60,7 @@ namespace ATAS.Indicators.Technical
         Color cWall = Color.White;
         Color cManSupp = Color.OrangeRed;
         Color cManRest = Color.Lime;
+        Color cDefault = Color.White;
 
         public LineOverload() :
             base(true)
@@ -95,7 +96,7 @@ namespace ATAS.Indicators.Technical
         [Display(GroupName = "Options", Name = "Text Font Size")]
         public int FontSize { get => iFontSize; set { iFontSize = value; RecalculateValues(); } }
 
-        [Display(GroupName = "Colors", Name = "cGex Color")]
+        [Display(GroupName = "Colors", Name = "Gex/VIX Color")]
         public Color Gex { get => cGex; set { cGex = value; RecalculateValues(); } }
         [Display(GroupName = "Colors", Name = "Resistance Color")]
         public Color Resist { get => cResist; set { cResist = value; RecalculateValues(); } }
@@ -103,7 +104,7 @@ namespace ATAS.Indicators.Technical
         public Color call { get => cWall; set { cWall = value; RecalculateValues(); } }
         [Display(GroupName = "Colors", Name = "crange Color")]
         public Color range { get => crange; set { crange = value; RecalculateValues(); } }
-        [Display(GroupName = "Colors", Name = "BL Color")]
+        [Display(GroupName = "Colors", Name = "BL/RD Color")]
         public Color cBLa { get => cBL; set { cBL = value; RecalculateValues(); } }
         [Display(GroupName = "Colors", Name = "Min/Support Color")]
         public Color Min { get => cmin; set { cmin = value; RecalculateValues(); } }
@@ -115,6 +116,8 @@ namespace ATAS.Indicators.Technical
         public Color DP { get => cDP; set { cDP = value; RecalculateValues(); } }
         [Display(GroupName = "Colors", Name = "ckvo1 Color")]
         public Color kvo1 { get => ckvo1; set { ckvo1 = value; RecalculateValues(); } }
+        [Display(GroupName = "Colors", Name = "Default Color")]
+        public Color Default { get => cDefault; set { cDefault = value; RecalculateValues(); } }
 
         [Display(GroupName = "Colors", Name = "Mancini Support Color")]
         public Color ManSupp { get => cManSupp; set { cManSupp = value; RecalculateValues(); } }
@@ -129,13 +132,21 @@ namespace ATAS.Indicators.Technical
             if (ChartInfo is null || InstrumentInfo is null)
                 return;
 
+            //var yWidth1 = ChartInfo.ChartContainer.Region.Width;
+            //context.DrawFillRectangle(new RenderPen(Color.White), Color.White,
+            //    new Rectangle(22, ChartInfo.ChartContainer.Region.Height / 2, ChartInfo.ChartContainer.Region.Width/2, 10));
+
             foreach (var l in lsS)
             {
                 var xH = ChartInfo.PriceChartContainer.GetXByBar(CurrentBar, false);
                 var yH = ChartInfo.PriceChartContainer.GetYByPrice(l.price, false);
                 var yH2 = ChartInfo.PriceChartContainer.GetYByPrice(l.price2, false);
+                var yWidth = ChartInfo.ChartContainer.Region.Width;
                 RenderPen highPen = new RenderPen(l.c, 1, DashStyle.Dash);
                 var rectPen = new Pen(new SolidBrush(l.c)) { Width = 1 };
+
+                //context.DrawLine(new RenderPen(Color.Green, 3, DashStyle.Solid), 0, yH, ChartInfo.ChartContainer.Region.Width / 2, yH);
+
                 if (l.price2 > 0)
                 {
                     DrawingRectangle dr = new DrawingRectangle(1, l.price, CurrentBar, l.price2, rectPen, new SolidBrush(l.c));
@@ -211,19 +222,19 @@ namespace ATAS.Indicators.Technical
                     if (!string.IsNullOrEmpty(price) && !string.IsNullOrEmpty(desc))
                     {
                         Color cl = Color.Gray;
-                        if (desc.Contains("range") || desc.Contains("HVL"))
+                        if (desc.Contains("range") || desc.Contains("HVL") || desc.Contains("HV") || desc.Contains("VAL"))
                             cl = crange;
-                        if (desc.Contains("min") || desc.Contains("Min") || desc.Contains("Support"))
+                        if (desc.ToLower().Contains("min") || desc.Contains("Support"))
                             cl = cmin;
                         else if (desc.Contains("kvo1"))
                             cl = ckvo1;
-                        else if (desc.Contains("BL"))
+                        else if (desc.Contains("BL") || desc.Contains("RD") || desc.Contains("SD"))
                             cl = cBL;
                         else if (desc.Contains("kvo2"))
                             cl = ckvo2;
-                        else if (desc.Contains("max") || desc.Contains("Max") || desc.Contains("Extreme"))
+                        else if (desc.ToLower().Contains("max") || desc.Contains("Extreme"))
                             cl = cmax;
-                        else if (desc.Contains("GEX"))
+                        else if (desc.Contains("GEX") || desc.Contains("VIX"))
                             cl = cGex;
                         else if (desc.Contains("Resist"))
                             cl = cResist;
