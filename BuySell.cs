@@ -29,13 +29,16 @@ namespace ATAS.Indicators.Technical
     using System.Reflection;
     using System.Runtime.InteropServices;
     using System.Drawing.Drawing2D;
+    using Newtonsoft.Json;
+    using Utils.Common.Logging;
+    using System.Windows.Media;
 
     #endregion
 
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "4.5";
+        private const String sVersion = "4.9";
 
         #region PRIVATE FIELDS
 
@@ -76,6 +79,7 @@ namespace ATAS.Indicators.Technical
         private static readonly HttpClient client = new HttpClient();
         private readonly PaintbarsDataSeries _paintBars = new("Paint bars");
 
+        private int iFutureSound = 0;
         private int iTouched = 0;
         private String _highS = "1st Hour High";
         private String _lowS = "1st Hour Low";
@@ -325,17 +329,22 @@ namespace ATAS.Indicators.Technical
                     var yH = ChartInfo.PriceChartContainer.GetYByPrice(l.price1, false);
                     var yH2 = ChartInfo.PriceChartContainer.GetYByPrice(l.price2, false);
                     var yWidth = ChartInfo.ChartContainer.Region.Width;
-                    RenderPen highPen = new RenderPen(l.c, 4, DashStyle.Dash);
+                    RenderPen highPen = new RenderPen(l.c, 4, System.Drawing.Drawing2D.DashStyle.Dash);
                     var rectPen = new Pen(new SolidBrush(l.c)) { Width = 1 };
 
-                    if (l.price2 > 0)
+                    if (l.price1 != l.price2)
                     {
-                        DrawingRectangle dr = new DrawingRectangle(1, l.price1, CurrentBar, l.price2, rectPen, new SolidBrush(l.c));
-                        if (!Rectangles.Contains(dr))
-                            Rectangles.Add(dr);
+                        highPen = new RenderPen(l.c, 1, System.Drawing.Drawing2D.DashStyle.Dash);
+                        //context.DrawLine(highPen, 0, yH, xH + 50, yH);
+                        //context.DrawLine(highPen, 0, yH2, xH + 50, yH2);
+                        Rectangle rectum = new Rectangle(0, yH, 5000, yH2 - yH);
+                        context.DrawFillRectangle(highPen, l.c, rectum);
+                        //DrawingRectangle dr = new DrawingRectangle(1, l.price1, CurrentBar, l.price2, rectPen, new SolidBrush(l.c));
+                        //if (!Rectangles.Contains(dr))
+                        //    Rectangles.Add(dr);
                     }
                     else
-                        context.DrawLine(highPen, 0, yH, xH, yH);
+                        context.DrawLine(highPen, 0, yH, xH + 50, yH);
 
                     context.DrawString(l.label, new RenderFont("Arial", iFontSize), Color.White, xH, yH);
                 }
@@ -522,8 +531,9 @@ namespace ATAS.Indicators.Technical
         {
             try
             {
-                SoundPlayer my_wave_file = new SoundPlayer(sWavDir + @"\" + s + ".wav");
-                my_wave_file.PlaySync();
+                System.Diagnostics.Process.Start("cmd.exe", "/c " + @"c:\temp\sounds\" + s + ".wav");
+                //SoundPlayer my_wave_file = new SoundPlayer(@"c:\temp\sounds\" + s + ".wav");
+                //my_wave_file.PlaySync();
             }
             catch (Exception)            {            }
         }
@@ -727,15 +737,21 @@ namespace ATAS.Indicators.Technical
             }
 
             if (bEMA200Bounce || bVWAPBounce)
+            {
                 _paintBars[pbar] = MColor.FromRgb(255, 255, 255);
+                iFutureSound = 1;
+            }
 
-            if (bKAMABounce && bKAMAWick)
+                if (bKAMABounce && bKAMAWick)
+            {
                 _paintBars[pbar] = MColor.FromRgb(255, 255, 255);
+                iFutureSound = 9;
+            }
 
-            if (bVolumeImbalances)
+                if (bVolumeImbalances)
             {
                 var highPen = new Pen(new SolidBrush(Color.FromArgb(255, 135, 183, 255))) 
-                { Width = 3, DashStyle = DashStyle.Dash };
+                { Width = 3, DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
                 if (green && c1G && candle.Open > p1C.Close)
                 {
                     if (LineTouches.IndexOf(bar) == -1)
@@ -743,6 +759,7 @@ namespace ATAS.Indicators.Technical
                         LineTouches.Add(bar);
                         HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
                         _negWhite[pbar] = candle.Low - (_tick * 2);
+                        iFutureSound = 12;
                     }
                 }
                 if (red && c1R && candle.Open < p1C.Close)
@@ -752,6 +769,7 @@ namespace ATAS.Indicators.Technical
                         LineTouches.Add(bar);
                         HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, candle.Open, highPen));
                         _posWhite[pbar] = candle.High + (_tick * 2);
+                        iFutureSound = 12;
                     }
                 }
             }
@@ -760,14 +778,20 @@ namespace ATAS.Indicators.Technical
                 bShowUp = false;
 
             if (bShowUp && bShowRegularBuySell)
+            {
+                iFutureSound = 10;
                 _posSeries[pbar] = candle.Low - (_tick * iOffset);
-
+            }
+                
             if ((psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) || (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (bUseHMA && hullUp))
                 bShowDown = false;
 
             if (bShowDown && bShowRegularBuySell)
+            {
                 _negSeries[pbar] = candle.High + _tick * iOffset;
-
+                iFutureSound = 11;
+            }
+                
             if (canColor > 1)
             {
                 var waddah = Math.Min(Math.Abs(t1) + 70, 255);
@@ -799,23 +823,27 @@ namespace ATAS.Indicators.Technical
             if (iLocalTouch > iTouched)
             {
                 iTouched = iLocalTouch;
-                // _paintBars[bar] = MColor.FromRgb(255, 255, 255);
+                //_paintBars[bar] = MColor.FromRgb(255, 255, 255);
                 bVolImbFinished = true;
             }
 
             if (bShowEngBB)
             {
-                //var gPen = new Pen(new SolidBrush(Color.Lime)) { Width = 1 };
-                //var rPen = new Pen(new SolidBrush(Color.Orange)) { Width = 1 };
+                var gPen = new Pen(new SolidBrush(Color.Lime)) { Width = 1 };
+                var rPen = new Pen(new SolidBrush(Color.Orange)) { Width = 1 };
 
-                //if ((candle.Low < bb_bottom || p1C.Low < bb_bottom || p2C.Low < bb_bottom) && c0Body > c1Body && c0G && c1R && candle.Close > p1C.Open)
-                //{
-                //    Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, gPen, new SolidBrush(Color.Transparent)));
-                //}
-                //else if ((candle.High > bb_top || p1C.High > bb_top || p2C.High > bb_top) && c0Body > c1Body && c0R && c1G && candle.Open < p1C.Close)
-                //{
-                //    Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, rPen, new SolidBrush(Color.Transparent)));
-                //}
+                if ((candle.Low < bb_bottom || p1C.Low < bb_bottom || p2C.Low < bb_bottom) && c0Body > c1Body && c0G && c1R && candle.Close > p1C.Open)
+                {
+                    _paintBars[bar] = MColor.FromRgb(0, 255, 0);
+                    iFutureSound = 17;
+                    //Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, gPen, new SolidBrush(Color.Transparent)));
+                }
+                else if ((candle.High > bb_top || p1C.High > bb_top || p2C.High > bb_top) && c0Body > c1Body && c0R && c1G && candle.Open < p1C.Close)
+                {
+                    _paintBars[bar] = MColor.FromRgb(255, 0, 0);
+                    iFutureSound = 17;
+                    //Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, rPen, new SolidBrush(Color.Transparent)));
+                }
             }
 
             if (bShowLines)
@@ -829,11 +857,13 @@ namespace ATAS.Indicators.Technical
             if (sq1 > 0 && sq1 < psq1 && psq1 > ppsq1 && bShowSqueeze)
             {
                 DrawText(pbar, "▼", Color.Yellow, Color.Transparent, false, true); // "▲" "▼"
+                iFutureSound = 5;
             }
                 
             if (sq1 < 0 && sq1 > psq1 && psq1 < ppsq1 && bShowSqueeze)
             {
                 DrawText(pbar, "▲", Color.Yellow, Color.Transparent, false, true);
+                iFutureSound = 5;
             }
 
             if (bAdvanced)
@@ -843,16 +873,19 @@ namespace ATAS.Indicators.Technical
                     (candle.Close < p1C.Close && p1C.Close < p2C.Close && p2C.Close < p3C.Close))
                 {
                         DrawText(pbar, "Stairs", Color.Yellow, Color.Transparent);
-                }
+                        iFutureSound = 4;
+                    }
 
                 if (eqHigh)
                 {
                     DrawText(pbar - 1, "Eq Hi", Color.Lime, Color.Transparent, false, true);
+                    iFutureSound = 6;
                 }
 
                 if (eqLow)
                 {
                     DrawText(pbar - 1, "Eq Low", Color.Yellow, Color.Transparent, false, true);
+                    iFutureSound = 7;
                 }
             }
 
@@ -899,6 +932,54 @@ namespace ATAS.Indicators.Technical
                 if (_lastBarCounted && UseAlerts)
                 {
                     var priceString = candle.Close.ToString();
+
+                    switch (iFutureSound)
+                    {
+                        case 1:
+                            play("majorline");
+                            break;
+                        case 2:
+                            play("VolRev");
+                            break;
+                        case 3:
+                            play("intensity");
+                            break;
+                        case 4:
+                            play("stairs");
+                            break;
+                        case 5:
+                            //play("squeezie");
+                            break;
+                        case 6:
+                            play("equal high");
+                            break;
+                        case 7:
+                            play("equal low");
+                            break;
+                        case 8:
+                            play("trampoline");
+                            break;
+                        case 9:
+                            play("kama");
+                            break;
+                        case 10:
+                            play("buy");
+                            break;
+                        case 11:
+                            play("sell");
+                            break;
+                        case 12:
+                            play("volimb");
+                            break;
+                        case 13:
+                            play("dojicity");
+                            break;
+                        case 17:
+                            play("engulf");
+                            break;
+                        default: break;
+                    }
+                    iFutureSound = 0;
                 }
                 _lastBar = bar;
             }
@@ -918,6 +999,37 @@ namespace ATAS.Indicators.Technical
         }
 
         #region MISC FUNCTIONS
+
+        private SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
+
+        private async Task WriteToTextFile(string file)
+        {
+            await semaphore.WaitAsync();
+            try
+            {
+                SoundPlayer snd = new SoundPlayer();
+                snd.SoundLocation = @"C:\temp\sounds\" + WavDir;
+                snd.Play();
+                System.Diagnostics.Process.Start("cmd.exe", "/c " + sWavDir + @"\copyimage.bat " + file);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }
+
+        private async Task SendWebhookAndWriteToFile(string message, string ticker, string price, string file)
+        {
+            var writeToTextFileTask = WriteToTextFile(file);
+            await Task.WhenAll(writeToTextFileTask);
+        }
+
+        private void PlaySound(String name)
+        {
+            SoundPlayer snd = new SoundPlayer();
+            snd.SoundLocation = @"C:\temp\sounds\" + name;
+            snd.Play();
+        }
 
         private void AddRecord(string price, string price2, string s)
         {
