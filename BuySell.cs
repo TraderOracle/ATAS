@@ -4,7 +4,6 @@ namespace ATAS.Indicators.Technical
     #region INCLUDES
 
     using System;
-    using System.Media;
     using System.Collections.ObjectModel;
     using System.ComponentModel;
     using System.ComponentModel.DataAnnotations;
@@ -26,19 +25,13 @@ namespace ATAS.Indicators.Technical
     using System.Globalization;
     using OFT.Rendering.Settings;
     using System.Text;
-    using System.Reflection;
-    using System.Runtime.InteropServices;
-    using System.Drawing.Drawing2D;
-    using Newtonsoft.Json;
-    using Utils.Common.Logging;
-    using System.Windows.Media;
 
     #endregion
 
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "4.9";
+        private const String sVersion = "5.2";
 
         #region PRIVATE FIELDS
 
@@ -144,14 +137,30 @@ namespace ATAS.Indicators.Technical
 
         #region SETTINGS
 
-        [Display(GroupName = "Buy/Sell Indicators", Name = "Show buy/sell dots")]
+        [Display(GroupName = "Main", Name = "Show buy/sell dots")]
         public bool ShowRegularBuySell { get => bShowRegularBuySell; set { bShowRegularBuySell = value; RecalculateValues(); } }
-        [Display(GroupName = "Buy/Sell Indicators", Name = "Use Alert Sounds")]
-        public bool UseAlerts { get; set; }
+        [Display(GroupName = "Main", Name = "Show today's news")]
+        public bool Show_News { get => bShowNews; set { bShowNews = value; RecalculateValues(); } }
+        private class candleColor : Collection<Entity>
+        {
+            public candleColor()
+                : base(new[]
+                {
+                    new Entity { Value = 1, Name = "None" },
+                    new Entity { Value = 2, Name = "Waddah Explosion" },
+                    new Entity { Value = 3, Name = "Squeeze" },
+                    new Entity { Value = 4, Name = "Delta" },
+                    new Entity { Value = 5, Name = "MACD" }
+                })
+            { }
+        }
+        [Display(Name = "Main", GroupName = "Colored Candles")]
+        [ComboBoxEditor(typeof(candleColor), DisplayMember = nameof(Entity.Name), ValueMember = nameof(Entity.Value))]
+        public int canColor { get => CandleColoring; set { if (value < 0) return; CandleColoring = value; RecalculateValues(); } }
 
-        // ========================================================================
-        // =======================    FILTER INDICATORS    ========================
-        // ========================================================================
+        // ==============================================================
+        // =======================    FILTERS    ========================
+        // ==============================================================
 
         [Display(GroupName = "Buy/Sell Filters", Name = "Waddah Explosion", Description = "The Waddah Explosion must be the correct color, and have a value")]
         public bool Use_Waddah_Explosion { get => bUseWaddah; set { bUseWaddah = value; RecalculateValues(); } }
@@ -171,26 +180,22 @@ namespace ATAS.Indicators.Technical
         public bool Use_T3 { get => bUseT3; set { bUseT3 = value; RecalculateValues(); } }
         [Display(GroupName = "Buy/Sell Filters", Name = "Fisher Transform", Description = "Fisher Transform must cross to the correct direction")]
         public bool Use_Fisher_Transform { get => bUseFisher; set { bUseFisher = value; RecalculateValues(); } }
-
-        [Display(GroupName = "Custom MA Filter", Name = "Use KAMA", Description = "Price crosses KAMA")]
+        [Display(GroupName = "Buy/Sell Filters", Name = "Use KAMA", Description = "Price crosses KAMA")]
         public bool Use_KAMA { get => bUseKAMA; set { bUseKAMA = value; RecalculateValues(); } }
 
-        private class candleColor : Collection<Entity>
-        {
-            public candleColor()
-                : base(new[]
-                {
-                    new Entity { Value = 1, Name = "None" },
-                    new Entity { Value = 2, Name = "Waddah Explosion" },
-                    new Entity { Value = 3, Name = "Squeeze" },
-                    new Entity { Value = 4, Name = "Delta" },
-                    new Entity { Value = 5, Name = "MACD" }
-                })
-            { }
-        }
-        [Display(Name = "Candle Color", GroupName = "Colored Candles")]
-        [ComboBoxEditor(typeof(candleColor), DisplayMember = nameof(Entity.Name), ValueMember = nameof(Entity.Value))]
-        public int canColor { get => CandleColoring; set { if (value < 0) return; CandleColoring = value; RecalculateValues(); } }
+        // =============================================================
+        // =======================    ALERTS    ========================
+        // =============================================================
+
+        [Display(GroupName = "Alerts", Name = "Use Alert Sounds")]
+        public bool UseAlerts { get; set; }
+        [Display(GroupName = "Alerts", Name = "WAV Sound Directory")]
+        public String WavDir { get => sWavDir; set { sWavDir = value; RecalculateValues(); } }
+
+        // ======================================================================
+        // =======================    COLORED CANDLES    ========================
+        // ======================================================================
+
         [Display(GroupName = "Colored Candles", Name = "Color BB engulfing candles")]
         public bool ShowEngBB { get => bShowEngBB; set { bShowEngBB = value; RecalculateValues(); } }
         [Display(GroupName = "Colored Candles", Name = "Show Reversal Patterns")]
@@ -207,10 +212,13 @@ namespace ATAS.Indicators.Technical
         public Color colEngulf { get => colorEngulfg; set { colorEngulfg = value; RecalculateValues(); } }
         [Display(GroupName = "Colored Candles", Name = "Engulfing RED Candle Color")]
         public Color colEngulfr { get => colorEngulfr; set { colorEngulfr = value; RecalculateValues(); } }
+
+        // =============================================================
+        // =======================    EXTRAS    ========================
+        // =============================================================
+
         [Display(GroupName = "Extras", Name = "Show kama wicks")]
         public bool KAMAWick { get => bKAMAWick; set { bKAMAWick = value; RecalculateValues(); } }
-        [Display(GroupName = "Extras", Name = "WAV Sound Directory")]
-        public String WavDir { get => sWavDir; set { sWavDir = value; RecalculateValues(); } }
 
         [Display(GroupName = "Extras", Name = "Show TraderSmarts")]
         public bool ShowTS { get => bShowTS; set { bShowTS = value; RecalculateValues(); } }
@@ -227,9 +235,7 @@ namespace ATAS.Indicators.Technical
         public bool Use_Tramp { get => bShowTramp; set { bShowTramp = value; RecalculateValues(); } }
         [Display(GroupName = "Extras", Name = "Show London Session Lines", Description = "Show lines from London session")]
         public bool ShowLondon { get => bShowLondon; set { bShowLondon = value; RecalculateValues(); } }
-        [Display(GroupName = "High Impact News", Name = "Show today's news")]
-        public bool Show_News { get => bShowNews; set { bShowNews = value; RecalculateValues(); } }
-        [Display(GroupName = "High Impact News", Name = "News font")]
+        [Display(GroupName = "Extras", Name = "News font")]
         [Range(1, 900)]
         public int NewsFont
         { get => iNewsFont; set { iNewsFont = value; RecalculateValues(); } }
@@ -329,7 +335,7 @@ namespace ATAS.Indicators.Technical
                     var yH = ChartInfo.PriceChartContainer.GetYByPrice(l.price1, false);
                     var yH2 = ChartInfo.PriceChartContainer.GetYByPrice(l.price2, false);
                     var yWidth = ChartInfo.ChartContainer.Region.Width;
-                    RenderPen highPen = new RenderPen(l.c, 4, System.Drawing.Drawing2D.DashStyle.Dash);
+                    RenderPen highPen = new RenderPen(l.c, 1, System.Drawing.Drawing2D.DashStyle.Dash);
                     var rectPen = new Pen(new SolidBrush(l.c)) { Width = 1 };
 
                     if (l.price1 != l.price2)
@@ -527,17 +533,6 @@ namespace ATAS.Indicators.Technical
             catch { }
         }
 
-        private void play(String s)
-        {
-            try
-            {
-                System.Diagnostics.Process.Start("cmd.exe", "/c " + @"c:\temp\sounds\" + s + ".wav");
-                //SoundPlayer my_wave_file = new SoundPlayer(@"c:\temp\sounds\" + s + ".wav");
-                //my_wave_file.PlaySync();
-            }
-            catch (Exception)            {            }
-        }
-
         #endregion
 
         protected override void OnCalculate(int bar, decimal value)
@@ -546,7 +541,7 @@ namespace ATAS.Indicators.Technical
             {
                 DataSeries.ForEach(x => x.Clear());
                 HorizontalLinesTillTouch.Clear();
-                Rectangles.Clear();
+                // Rectangles.Clear();
                 _lastBarCounted = false;
                 return;
             }
@@ -583,6 +578,8 @@ namespace ATAS.Indicators.Technical
 
             var red = candle.Close < candle.Open;
             var green = candle.Close > candle.Open;
+            var c00G = pcandle.Open < pcandle.Close;
+            var c00R = pcandle.Open > pcandle.Close;
             var c0G = candle.Open < candle.Close;
             var c0R = candle.Open > candle.Close;
             var c1G = p1C.Open < p1C.Close;
@@ -594,6 +591,7 @@ namespace ATAS.Indicators.Technical
             var c4G = p4C.Open < p4C.Close;
             var c4R = p4C.Open > p4C.Close;
 
+            var c00Body = Math.Abs(pcandle.Close - pcandle.Open);
             var c0Body = Math.Abs(candle.Close - candle.Open);
             var c1Body = Math.Abs(p1C.Close - p1C.Open);
             var c2Body = Math.Abs(p2C.Close - p2C.Open);
@@ -742,15 +740,15 @@ namespace ATAS.Indicators.Technical
                 iFutureSound = 1;
             }
 
-                if (bKAMABounce && bKAMAWick)
+            if (bKAMABounce && bKAMAWick)
             {
                 _paintBars[pbar] = MColor.FromRgb(255, 255, 255);
                 iFutureSound = 9;
             }
 
-                if (bVolumeImbalances)
+            if (bVolumeImbalances)
             {
-                var highPen = new Pen(new SolidBrush(Color.FromArgb(255, 135, 183, 255))) 
+                var highPen = new Pen(new SolidBrush(Color.FromArgb(255, 135, 183, 255)))
                 { Width = 3, DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
                 if (green && c1G && candle.Open > p1C.Close)
                 {
@@ -782,7 +780,7 @@ namespace ATAS.Indicators.Technical
                 iFutureSound = 10;
                 _posSeries[pbar] = candle.Low - (_tick * iOffset);
             }
-                
+
             if ((psarBuy && bUsePSAR) || (!macdDown && bUseMACD) || (!fisherDown && bUseFisher) || (value > kama9 && bUseKAMA) || (value > t3 && bUseT3) || (t1 >= 0 && bUseWaddah) || (ao > 0 && bUseAO) || (std2 == 0 && bUseSuperTrend) || (sq1 > 0 && bUseSqueeze) || (bUseHMA && hullUp))
                 bShowDown = false;
 
@@ -791,7 +789,7 @@ namespace ATAS.Indicators.Technical
                 _negSeries[pbar] = candle.High + _tick * iOffset;
                 iFutureSound = 11;
             }
-                
+
             if (canColor > 1)
             {
                 var waddah = Math.Min(Math.Abs(t1) + 70, 255);
@@ -816,7 +814,7 @@ namespace ATAS.Indicators.Technical
             #region ADVANCED LOGIC
 
             int iLocalTouch = 0;
-            foreach(LineTillTouch ltt in HorizontalLinesTillTouch)
+            foreach (LineTillTouch ltt in HorizontalLinesTillTouch)
                 if (ltt.Finished)
                     iLocalTouch++;
 
@@ -832,15 +830,18 @@ namespace ATAS.Indicators.Technical
                 var gPen = new Pen(new SolidBrush(Color.Lime)) { Width = 1 };
                 var rPen = new Pen(new SolidBrush(Color.Orange)) { Width = 1 };
 
-                if ((candle.Low < bb_bottom || p1C.Low < bb_bottom || p2C.Low < bb_bottom) && c0Body > c1Body && c0G && c1R && candle.Close > p1C.Open)
+                if ((pcandle.Low < bb_bottom || candle.Low < bb_bottom || p1C.Low < bb_bottom || p2C.Low < bb_bottom) &&
+                    (c00Body > c0Body) &&
+                    (c00G && c0R) &&
+                    (pcandle.Close > candle.Open || pcandle.Close == candle.Open))
                 {
                     _paintBars[bar] = MColor.FromRgb(0, 255, 0);
                     iFutureSound = 17;
                     //Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, gPen, new SolidBrush(Color.Transparent)));
                 }
-                else if ((candle.High > bb_top || p1C.High > bb_top || p2C.High > bb_top) && c0Body > c1Body && c0R && c1G && candle.Open < p1C.Close)
+                else if ((pcandle.High > bb_top || p1C.High > bb_top || p2C.High > bb_top) && c00Body > c0Body && c00R && c0G && pcandle.Open < candle.Close)
                 {
-                    _paintBars[bar] = MColor.FromRgb(255, 0, 0);
+                    _paintBars[bar] = MColor.FromRgb(255, 161, 102);
                     iFutureSound = 17;
                     //Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, rPen, new SolidBrush(Color.Transparent)));
                 }
@@ -914,12 +915,14 @@ namespace ATAS.Indicators.Technical
                     c2G && p2C.High >= (bb_top - (_tick * 30)))
                 {
                     DrawText(pbar, "TR", Color.Yellow, Color.BlueViolet, false, true);
+                    iFutureSound = 8;
                 }
                    
                 if (c0G && c1G && candle.Close > p1C.Close && (rsi < 25 || rsi1 < 25 || rsi2 < 25) &&
                     c2R && p2C.Low <= (bb_bottom + (_tick * 30)))
                 {
                     DrawText(pbar, "TR", Color.Yellow, Color.BlueViolet, false, true);
+                    iFutureSound = 8;
                 }
             }
 
@@ -998,38 +1001,7 @@ namespace ATAS.Indicators.Technical
                 LoadTraderSmarts();
         }
 
-        #region MISC FUNCTIONS
-
-        private SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
-
-        private async Task WriteToTextFile(string file)
-        {
-            await semaphore.WaitAsync();
-            try
-            {
-                SoundPlayer snd = new SoundPlayer();
-                snd.SoundLocation = @"C:\temp\sounds\" + WavDir;
-                snd.Play();
-                System.Diagnostics.Process.Start("cmd.exe", "/c " + sWavDir + @"\copyimage.bat " + file);
-            }
-            finally
-            {
-                semaphore.Release();
-            }
-        }
-
-        private async Task SendWebhookAndWriteToFile(string message, string ticker, string price, string file)
-        {
-            var writeToTextFileTask = WriteToTextFile(file);
-            await Task.WhenAll(writeToTextFileTask);
-        }
-
-        private void PlaySound(String name)
-        {
-            SoundPlayer snd = new SoundPlayer();
-            snd.SoundLocation = @"C:\temp\sounds\" + name;
-            snd.Play();
-        }
+        #region TRADERSMARTS
 
         private void AddRecord(string price, string price2, string s)
         {
@@ -1120,7 +1092,20 @@ namespace ATAS.Indicators.Technical
             catch { }
         }
 
-            private void MarkOpenSession(int bar)
+        #endregion
+
+        #region MISC FUNCTIONS
+
+        private void play(String s)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start("cmd.exe", "/c " + sWavDir + "\\" + s + ".wav");
+            }
+            catch { }
+        }
+
+        private void MarkOpenSession(int bar)
         {
             var candle = GetCandle(bar);
             var diff = InstrumentInfo.TimeZone;
