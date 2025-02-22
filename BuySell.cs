@@ -25,13 +25,15 @@ namespace ATAS.Indicators.Technical
     using System.Globalization;
     using OFT.Rendering.Settings;
     using System.Text;
+    using System.Linq;
+    using System.Windows.Media;
 
     #endregion
 
     [DisplayName("TraderOracle Buy/Sell")]
     public class BuySell : Indicator
     {
-        private const String sVersion = "5.2";
+        private const String sVersion = "5.3";
 
         #region PRIVATE FIELDS
 
@@ -336,18 +338,12 @@ namespace ATAS.Indicators.Technical
                     var yH2 = ChartInfo.PriceChartContainer.GetYByPrice(l.price2, false);
                     var yWidth = ChartInfo.ChartContainer.Region.Width;
                     RenderPen highPen = new RenderPen(l.c, 1, System.Drawing.Drawing2D.DashStyle.Dash);
-                    var rectPen = new Pen(new SolidBrush(l.c)) { Width = 1 };
+                    var rectPen = new Pen(new SolidBrush(Color.FromArgb(120, l.c))) { Width = 1 };
 
                     if (l.price1 != l.price2)
                     {
-                        highPen = new RenderPen(l.c, 1, System.Drawing.Drawing2D.DashStyle.Dash);
-                        //context.DrawLine(highPen, 0, yH, xH + 50, yH);
-                        //context.DrawLine(highPen, 0, yH2, xH + 50, yH2);
                         Rectangle rectum = new Rectangle(0, yH, 5000, yH2 - yH);
-                        context.DrawFillRectangle(highPen, l.c, rectum);
-                        //DrawingRectangle dr = new DrawingRectangle(1, l.price1, CurrentBar, l.price2, rectPen, new SolidBrush(l.c));
-                        //if (!Rectangles.Contains(dr))
-                        //    Rectangles.Add(dr);
+                        context.DrawFillRectangle(highPen, Color.FromArgb(120, l.c), rectum);
                     }
                     else
                         context.DrawLine(highPen, 0, yH, xH + 50, yH);
@@ -541,7 +537,6 @@ namespace ATAS.Indicators.Technical
             {
                 DataSeries.ForEach(x => x.Clear());
                 HorizontalLinesTillTouch.Clear();
-                // Rectangles.Clear();
                 _lastBarCounted = false;
                 return;
             }
@@ -839,7 +834,10 @@ namespace ATAS.Indicators.Technical
                     iFutureSound = 17;
                     //Rectangles.Add(new DrawingRectangle(pbar, p1C.Low - 499, pbar, p1C.High + 499, gPen, new SolidBrush(Color.Transparent)));
                 }
-                else if ((pcandle.High > bb_top || p1C.High > bb_top || p2C.High > bb_top) && c00Body > c0Body && c00R && c0G && pcandle.Open < candle.Close)
+                else if ((pcandle.High > bb_top || candle.High > bb_top || p1C.High > bb_top) && 
+                    (c00Body > c0Body) && 
+                    (c00R && c0G) && 
+                    (pcandle.Open < candle.Close || pcandle.Open == candle.Close))
                 {
                     _paintBars[bar] = MColor.FromRgb(255, 161, 102);
                     iFutureSound = 17;
