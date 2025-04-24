@@ -7,8 +7,19 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Drawing.Common" Version="8.0.2" />
-    <PackageReference Include="System.Windows.Extensions" Version="8.0.0" />
+    <PackageReference Include="CsvHelper" Version="33.0.1" />
+    <PackageReference Include="Google.Apis" Version="1.69.0" />
+    <PackageReference Include="Google.Apis.Drive.v3" Version="1.69.0.3740" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.12.1" />
+    <PackageReference Include="InstagramApiSharp" Version="1.8.1" />
+    <PackageReference Include="MailKit" Version="4.11.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.4" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="SharpZipLib" Version="1.4.2" />
+    <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
+    <PackageReference Include="System.Windows.Extensions" Version="9.0.4" />
+    <PackageReference Include="System.Xml.ReaderWriter" Version="4.3.1" />
+    <PackageReference Include="Telegram.Bot" Version="22.5.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,9 +34,6 @@
     </Reference>
     <Reference Include="ATAS.Indicators.Technical">
       <HintPath>C:\Program Files (x86)\ATAS Platform\ATAS.Indicators.Technical.dll</HintPath>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>bin\Debug\net7.0\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="OFT.Attributes">
       <HintPath>C:\Program Files (x86)\ATAS Platform\OFT.Attributes.dll</HintPath>
@@ -46,10 +54,7 @@
       <HintPath>C:\Program Files (x86)\ATAS Platform\OFT.Rendering.dll</HintPath>
     </Reference>
     <Reference Include="PresentationCore">
-      <HintPath>..\Code\ATAS-Buy-Sell\bin\Debug\net8.0-windows8.0\PresentationCore.dll</HintPath>
-    </Reference>
-    <Reference Include="Utils.Common">
-      <HintPath>bin\Debug\net7.0\Utils.Common.dll</HintPath>
+      <HintPath>bin\Debug\net8.0-windows8.0\PresentationCore.dll</HintPath>
     </Reference>
   </ItemGroup>
 
