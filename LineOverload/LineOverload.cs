@@ -143,9 +143,9 @@ namespace ATAS.Indicators.Technical
         var yH2 = ChartInfo.PriceChartContainer.GetYByPrice(l.price2, false);
         var yWidth = ChartInfo.ChartContainer.Region.Width;
         RenderPen KPPen = new RenderPen(l.c, 2, DashStyle.Dash);
-        RenderPen MQPen = new RenderPen(l.c, 2, DashStyle.Solid);
-        RenderPen BSPen = new RenderPen(l.c, 2, DashStyle.DashDot);
-        RenderPen Pen = new RenderPen(l.c, 2, DashStyle.DashDotDot);
+        RenderPen MQPen = new RenderPen(l.c, 1, DashStyle.Solid);
+        RenderPen BSPen = new RenderPen(l.c, 3, DashStyle.DashDot);
+        RenderPen Pen = new RenderPen(l.c, 1, DashStyle.DashDotDot);
         var rectPen = new Pen(new SolidBrush(l.c)) { Width = 2 };
 
         if (l.price2 > 0)
@@ -219,7 +219,8 @@ namespace ATAS.Indicators.Technical
       try
       {
         int i = 0;
-        sLevels = sLevels.Replace(" ,", ",").Replace(", ", ",").Replace(" , ", ",");
+        sLevels = sLevels.Replace(" ", "").Replace(";", ",");
+        sLevels = sLevels.Replace(" ", "").Replace(";", ",");
         string[] sb = sLevels.Split(",");
         string price = string.Empty, desc = string.Empty;
         foreach (string sr in sb)
@@ -231,10 +232,11 @@ namespace ATAS.Indicators.Technical
 
           if (!string.IsNullOrEmpty(price) && !string.IsNullOrEmpty(desc))
           {
-            Color cl = Color.Orange;
+            Color cl = Color.Lime;
             if (desc.Contains("range") || desc.Contains("HVL") || desc.Contains("HV") || desc.Contains("VAL"))
               cl = crange;
-            if (desc.ToLower().Contains("min") || desc.Contains("Support"))
+            if (desc.ToLower().Contains("min") || desc.Contains("Support") || 
+              desc.ToLower().Contains("l1") || desc.ToLower().Contains("l2") || desc.ToLower().Contains("l3") || desc.ToLower().Contains("l4") || desc.ToLower().Contains("l5"))
               cl = cmin;
             else if (desc.Contains("kvo1"))
               cl = ckvo1;
@@ -242,9 +244,11 @@ namespace ATAS.Indicators.Technical
               cl = cBL;
             else if (desc.Contains("kvo2"))
               cl = ckvo2;
-            else if (desc.ToLower().Contains("max") || desc.Contains("Extreme"))
+            else if (desc.ToLower().Contains("max") || desc.Contains("Extreme") ||
+              desc.ToLower().Contains("h4") || desc.ToLower().Contains("h5") || desc.ToLower().Contains("h3") || desc.ToLower().Contains("h2"))
               cl = cmax;
-            else if (desc.Contains("GEX") || desc.Contains("VIX"))
+            else if (desc.Contains("GEX") || desc.Contains("VIX") ||
+              desc.ToLower().Contains("mid"))
               cl = cGex;
             else if (desc.Contains("Resist"))
               cl = cResist;
