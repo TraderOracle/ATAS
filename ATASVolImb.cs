@@ -556,7 +556,7 @@ namespace ATAS.Indicators.Technical
       Uri uri = new Uri(whurl);
       client1.Headers.Add("Content-Type", "application/json");
 
-      client1.UploadData(whurl, Encoding.UTF8.GetBytes(message));
+      client1.UploadData(whurl, Encoding.UTF8.GetBytes("{ \"content\": \"" + message + "\" }"));
       // client1.UploadFileAsync(uri, sFil);
     }
     private SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
