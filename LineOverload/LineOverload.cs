@@ -49,6 +49,7 @@ namespace ATAS.Indicators.Technical
     private int prevBar = 0;
     private bool _lastBarCounted;
     private bool bFirstDisplay = false;
+    private string filePath = @"c:\temp\motivelines.csv";
 
     Color cBL = Color.DeepPink;
     Color cmin = Color.Red;
@@ -211,6 +212,36 @@ namespace ATAS.Indicators.Technical
 
     #region LOAD EVERYTHING ELSE
 
+    private void LoadCSVLines()
+    {
+      string sDesc = string.Empty;
+      string sPrice = string.Empty;
+
+      try
+      {
+        string fileContent = File.ReadAllText(filePath);
+        string[] lines = fileContent.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (string line in lines)
+        {
+          string[] parts = line.Split(',');
+          if (parts.Length >= 3)
+          {
+            string symbol = parts[0].Trim();
+            string desc = parts[1].Trim();
+            if (double.TryParse(parts[2].Trim(), out double price))
+            {
+              days a = new days();
+              a.price = Convert.ToDecimal(price);
+              a.label = desc;
+              lsS.Add(a);
+            }
+          }
+        }
+      }
+      catch { }
+    }
+
     private void LoadFromService(String sLevels, string source)
     {
       string sDesc = string.Empty;
@@ -291,7 +322,7 @@ namespace ATAS.Indicators.Technical
         LoadFromService(sBlindSpots, "BS");
         LoadFromService(sDarkPool, "DP");
         LoadFromService(sCTLevels, "CT");
-
+        LoadCSVLines();
         LoadMancini(sManciniSupport, cManSupp);
         LoadMancini(sManciniResist, cManRest);
       }
