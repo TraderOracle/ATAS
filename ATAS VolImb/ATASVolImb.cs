@@ -33,7 +33,9 @@ namespace ATAS.Indicators.Technical
   public class TOVolImb : Indicator
   {
     #region VARIABLES
-    private const String sVersion = "1.4";
+    private const String sVersion = "1.5";
+
+    private string filePath = @"c:\temp\motivelines.csv";
 
     private struct days
     {
@@ -47,6 +49,7 @@ namespace ATAS.Indicators.Technical
     }
     private List<days> lsS = new List<days>();
     private bool bFirstDisplay = false;
+    private bool bCSVImported = false;
 
     private const int LINE_WICK_ENG = 16;
     private const int LINE_TOUCH_ENG = 17;
@@ -84,11 +87,8 @@ namespace ATAS.Indicators.Technical
     private int iScreenShotX = 300;
     private int iScreenShotY = 400;
     private bool bScreenShotted = false;
-    private string sKPValues = "BH2,6027.14,BMid,5981.25,BL2,5935.36,CH2,6047.91,CL2,5914.59,DH2,6064.95,DL2,5897.55,EH2,6080.52,EL2,5881.98,CH3,6006.46,CMid,5959.25,CL3,5910.28,DH3,6026.71,DL3,5891.70,EH3,6045.10,EL3,5874.15,DH4,5919.21,DMid,5859.25,DL4,5797.42,EH4,5944.78,EL4,5771.03,EH5,5915.46,EMid,5858.50,EL5,5801.54";
 
     #region SETTINGS
-    [Display(GroupName = "Values", Name = "General")]
-    public string KPValues { get => sKPValues; set { sKPValues = value; RecalculateValues(); } }
 
     [Display(Name = "Line Width", GroupName = "General", Order = int.MaxValue)]
     public int LineWidth { get => iLineWidth; set { iLineWidth = value; RecalculateValues(); } }
@@ -174,39 +174,34 @@ namespace ATAS.Indicators.Technical
 
     #endregion
 
-    private void LoadLines(String sLevels)
+    private void LoadLines()
     {
       string sDesc = string.Empty;
       string sPrice = string.Empty;
 
       try
       {
-        int i = 2;
-        sLevels = sLevels.Replace(" ", "").Replace(";", ",");
-        sLevels = sLevels.Replace(" ", "").Replace(";", ",");
-        string[] sb = sLevels.Split(",");
-        string price = string.Empty, desc = string.Empty;
-        foreach (string sr in sb)
-        {
-          if (i % 2 != 0)
-            price = sr;
-          else
-            desc = sr;
+        string fileContent = File.ReadAllText(filePath);
+        string[] lines = fileContent.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
 
-          if (!string.IsNullOrEmpty(price) && !string.IsNullOrEmpty(desc))
+        foreach (string line in lines)
+        {
+          string[] parts = line.Split(',');
+          if (parts.Length >= 3)
           {
-            days a = new days();
-            a.idx = i;
-            a.price = Convert.ToDecimal(price);
-            a.label = desc;
-            lsS.Add(a);
+            string symbol = parts[0].Trim();
+            string desc = parts[1].Trim();
+            if (double.TryParse(parts[2].Trim(), out double price))
+            {
+              days a = new days();
+              a.price = Convert.ToDecimal(price);
+              a.label = desc;
+              lsS.Add(a);
+            }
           }
-          i++;
         }
       }
-      catch (Exception ex)
-      {
-      }
+      catch { }
     }
 
     protected override void OnCalculate(int bar, decimal value)
@@ -221,12 +216,9 @@ namespace ATAS.Indicators.Technical
       if (bar < 6) return;
 
       if (!bFirstDisplay)
-      {
-        LoadLines(sKPValues);
-        bFirstDisplay = true;
-      }
+        LoadLines();
 
-      #region CANDLE CALCULATIONS
+        #region CANDLE CALCULATIONS
 
       var pbar = bar - 1;
       var pcandle = GetCandle(bar - 1);
