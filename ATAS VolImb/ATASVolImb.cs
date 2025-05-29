@@ -33,7 +33,7 @@ namespace ATAS.Indicators.Technical
   public class TOVolImb : Indicator
   {
     #region VARIABLES
-    private const String sVersion = "1.5";
+    private const String sVersion = "1.6";
 
     private string filePath = @"c:\temp\motivelines.csv";
 
@@ -49,7 +49,6 @@ namespace ATAS.Indicators.Technical
     }
     private List<days> lsS = new List<days>();
     private bool bFirstDisplay = false;
-    private bool bCSVImported = false;
 
     private const int LINE_WICK_ENG = 16;
     private const int LINE_TOUCH_ENG = 17;
@@ -174,7 +173,7 @@ namespace ATAS.Indicators.Technical
 
     #endregion
 
-    private void LoadLines()
+    private void LoadCSVLines()
     {
       string sDesc = string.Empty;
       string sPrice = string.Empty;
@@ -216,7 +215,7 @@ namespace ATAS.Indicators.Technical
       if (bar < 6) return;
 
       if (!bFirstDisplay)
-        LoadLines();
+        LoadCSVLines();
 
         #region CANDLE CALCULATIONS
 
@@ -310,18 +309,18 @@ namespace ATAS.Indicators.Technical
       }
 
       // ENGULFING CANDLE OFF THE BOLLINGER BAND
-      if (candle.High > bb_top && p1C.High > pbb_top &&
-         c0Body > c1Body && c0R && c1G)
+      if (candle.High > bb_top && p1C.High > pbb_top && c0Body > c1Body && c0R && c1G)
       {
-        _paintBars[pbar] = MColor.FromRgb(255, 255, 255);
+        _paintBars[bar] = MColor.FromRgb(255, 255, 255);
         _negSeries[pbar] = candle.High + (_tick * 2);
+        
         iFutureSound = ENG_BB;
       }
-      else if (candle.Low < bb_bottom && p1C.Low < pbb_bottom &&
-         c1Body > c2Body && c1G && c2R)
+      else if (candle.Low < bb_bottom && p1C.Low < pbb_bottom && c1Body > c2Body && c1G && c2R)
       {
-        _paintBars[pbar] = MColor.FromRgb(255, 255, 255);
+        _paintBars[bar] = MColor.FromRgb(255, 255, 255);
         _posSeries[pbar] = candle.Low - (_tick * 2);
+        
         iFutureSound = ENG_BB;
       }
 
@@ -380,7 +379,8 @@ namespace ATAS.Indicators.Technical
           HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, pcandle.Open, highPen));
           if (LineTouches.Contains(pbar - 1))
             iFutureSound = DOUBLE_VOL_IMB_DROP_G;
-          _posUP[pbar] = candle.Low - (_tick);
+          //_posUP[pbar] = candle.Low - (_tick);
+          DrawText(bar, "▲", Color.Yellow, Color.Transparent, false, true);
         }
       }
       else if (c0R && c1R && open < p1C.Close)
@@ -391,7 +391,8 @@ namespace ATAS.Indicators.Technical
           HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, pcandle.Open, highPen));
           if (LineTouches.Contains(pbar - 1))
             iFutureSound = DOUBLE_VOL_IMB_DROP_R;
-          _negDN[pbar] = candle.High + (_tick);
+          //_negDN[pbar] = candle.High + (_tick);
+          DrawText(bar, "▼", Color.Yellow, Color.Transparent, false, true); // "▲" "▼"
         }
       }
 
