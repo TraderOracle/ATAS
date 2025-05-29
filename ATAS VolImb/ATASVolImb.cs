@@ -294,13 +294,15 @@ namespace ATAS.Indicators.Technical
           }
 
           // GREEN DOUBLE TOUCH, engulfing
-          else if (c0G && candle.High > s.price && candle.Low < s.price && c1R && p1C.Low < s.price && c0Body > c1Body)
+          else if (c0G && candle.High > s.price && candle.Low < s.price && 
+            c1R && p1C.Low < s.price && c0Body > c1Body)
           {
             _paintBars[bar] = MColor.FromRgb(255, 204, 0);
             iFutureSound = LINE_TOUCH_ENG;
           }
           // RED DOUBLE TOUCH, engulfing
-          else if (c0R && candle.Low < s.price && candle.High > s.price && c1G && p1C.High > s.price && p1C.Low < s.price && c0Body > c1Body)
+          else if (c0R && candle.Low < s.price && candle.High > s.price && 
+            c1G && p1C.High > s.price && p1C.Low < s.price && c0Body > c1Body)
           {
             _paintBars[bar] = MColor.FromRgb(255, 204, 0);
             iFutureSound = LINE_TOUCH_ENG;
@@ -373,11 +375,11 @@ namespace ATAS.Indicators.Technical
       // REGULAR VOLUME IMBALANCE
       if (c0G && c1G && open > p1C.Close)
       {
-        if (LineTouches.IndexOf(pbar) == -1)
+        if (LineTouches.IndexOf(bar) == -1)
         {
-          LineTouches.Add(pbar);
-          HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, pcandle.Open, highPen));
-          if (LineTouches.Contains(pbar - 1))
+          LineTouches.Add(bar);
+          HorizontalLinesTillTouch.Add(new LineTillTouch(bar, pcandle.Close, highPen));
+          if (LineTouches.Contains(bar - 1))
             iFutureSound = DOUBLE_VOL_IMB_DROP_G;
           //_posUP[pbar] = candle.Low - (_tick);
           DrawText(bar, "▲", Color.Yellow, Color.Transparent, false, true);
@@ -385,11 +387,11 @@ namespace ATAS.Indicators.Technical
       }
       else if (c0R && c1R && open < p1C.Close)
       {
-        if (LineTouches.IndexOf(pbar) == -1)
+        if (LineTouches.IndexOf(bar) == -1)
         {
-          LineTouches.Add(pbar);
-          HorizontalLinesTillTouch.Add(new LineTillTouch(pbar, pcandle.Open, highPen));
-          if (LineTouches.Contains(pbar - 1))
+          LineTouches.Add(bar);
+          HorizontalLinesTillTouch.Add(new LineTillTouch(bar, pcandle.Close, highPen));
+          if (LineTouches.Contains(bar - 1))
             iFutureSound = DOUBLE_VOL_IMB_DROP_R;
           //_negDN[pbar] = candle.High + (_tick);
           DrawText(bar, "▼", Color.Yellow, Color.Transparent, false, true); // "▲" "▼"
