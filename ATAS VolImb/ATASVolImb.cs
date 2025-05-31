@@ -13,7 +13,6 @@ namespace ATAS.Indicators.Technical
   using Color = System.Drawing.Color;
   using MColors = System.Windows.Media.Colors;
   using MColor = System.Windows.Media.Color;
-  using Pen = System.Drawing.Pen;
   using System.Text;
   using System.Net;
   using System.Drawing.Imaging;
@@ -25,6 +24,8 @@ namespace ATAS.Indicators.Technical
   using System.Linq.Expressions;
   using Org.BouncyCastle.Crypto.Macs;
   using System.Media;
+  using OFT.Rendering.Context;
+  using OFT.Rendering.Tools;
 
 
   #endregion
@@ -118,12 +119,14 @@ namespace ATAS.Indicators.Technical
     private readonly ValueDataSeries _posUP = new("Vol Imbalance Up") { Color = MColors.Lime, VisualType = VisualMode.Block, Width = 3 };
     private readonly ValueDataSeries _negDN = new("Vol Imbalance Down") { Color = MColors.Red, VisualType = VisualMode.Block, Width = 3 };
 
+    #endregion
+
     public TOVolImb() :
         base(true)
     {
+      EnableCustomDrawing = true;
       DenyToChangePanel = true;
       SubscribeToDrawingEvents(DrawingLayouts.Historical);
-      EnableCustomDrawing = true;
 
       DataSeries[0] = _posSeries;
       DataSeries.Add(_negSeries);
@@ -139,7 +142,6 @@ namespace ATAS.Indicators.Technical
       Add(ab);
       Add(ateer);
     }
-    #endregion
 
     private readonly RSI _rsi = new() { Period = 14 };
     private readonly BollingerBands _bb = new BollingerBands() { Period = 20, Shift = 0, Width = 2 };
@@ -173,6 +175,24 @@ namespace ATAS.Indicators.Technical
 
     #endregion
 
+    #region RENDER
+    protected override void OnRender(RenderContext context, DrawingLayouts layout)
+    {
+      if (ChartInfo is null || InstrumentInfo is null)
+        return;
+
+      foreach (var l in lsS)
+      {
+        var xH = ChartInfo.PriceChartContainer.GetXByBar(CurrentBar, false);
+        var yH = ChartInfo.PriceChartContainer.GetYByPrice(l.price, false);
+        var yWidth = ChartInfo.ChartContainer.Region.Width;
+        RenderPen Pen = new RenderPen(l.c, iLineWidth, System.Drawing.Drawing2D.DashStyle.Dot);
+        context.DrawLine(Pen, 0, yH, xH, yH);
+        context.DrawString(l.label, new RenderFont("Arial", iFontSize), l.c, xH, yH);
+      }
+    }
+    #endregion
+
     private void LoadCSVLines()
     {
       string sDesc = string.Empty;
@@ -192,9 +212,19 @@ namespace ATAS.Indicators.Technical
             string desc = parts[1].Trim();
             if (double.TryParse(parts[2].Trim(), out double price))
             {
+              Color cl = Color.White;
+              if (desc.ToLower().Contains("mid"))
+                cl = Color.Gold;
+              else if (desc.ToLower().Contains(" l"))
+                cl = Color.LimeGreen;
+              else if (desc.ToLower().Contains(" h"))
+                cl = Color.Red;
+              else if (desc.ToLower().Contains("mmz"))
+                cl = Color.Aqua;
               days a = new days();
               a.price = Convert.ToDecimal(price);
               a.label = desc;
+              a.c = cl;
               lsS.Add(a);
             }
           }
@@ -215,8 +245,11 @@ namespace ATAS.Indicators.Technical
       if (bar < 6) return;
 
       if (!bFirstDisplay)
+      {
         LoadCSVLines();
-
+        bFirstDisplay = true;
+      }
+       
         #region CANDLE CALCULATIONS
 
       var pbar = bar - 1;
@@ -369,7 +402,7 @@ namespace ATAS.Indicators.Technical
 
       #region VOLUME IMBALANCES
 
-      var highPen = new Pen(new SolidBrush(Color.FromArgb(255, 156, 227, 255)))
+      var highPen = new System.Drawing.Pen(new SolidBrush(Color.FromArgb(255, 156, 227, 255)))
       { Width = iLineWidth, DashStyle = System.Drawing.Drawing2D.DashStyle.Solid };
 
       // REGULAR VOLUME IMBALANCE
